@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Platform } from "react-native";
 import * as Linking from "expo-linking";
-import { supabase } from "./supabaseClient";
+import { supabase } from "@/lib/supabase";
 import * as SecureStore from "expo-secure-store";
 
 interface User {
@@ -45,9 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .select('role, student_id')
             .eq('id', session.user.id)
             .single();
-          
+
           console.log('Fetched user data from database:', { userData, userError });
-          
+
           setUser({
             id: session.user.id,
             email: session.user.email || '',
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userData?.role || 'student',
             student_id: userData?.student_id,
           });
-          
+
           console.log('Set user state with role:', userData?.role || 'student');
         } else {
           setUser(null);
@@ -79,9 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select('role, student_id')
           .eq('id', session.user.id)
           .single();
-        
+
         console.log('Fetched user data from database (fetchUser):', { userData, userError });
-        
+
         setUser({
           id: session.user.id,
           email: session.user.email || '',
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: userData?.role || 'student',
           student_id: userData?.student_id,
         });
-        
+
         console.log('Set user state with role (fetchUser):', userData?.role || 'student');
       } else {
         setUser(null);
@@ -123,9 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: { name }
         }
       });
-      
+
       if (authError) throw authError;
-      
+
       // 2. Insert user data into user table (your existing table)
       if (authData.user) {
         const { error: dbError } = await supabase.from('user').insert({
@@ -134,9 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: name || '',
           student_id: studentId || null,
           role: role || 'student',
-          email_verified: false
         });
-        
+
         if (dbError) {
           console.error('Error inserting user data:', dbError);
           // Don't throw error here - auth was successful, just log the issue

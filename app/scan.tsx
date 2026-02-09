@@ -3,18 +3,29 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
+import { BackButton } from '@/components/BackButton';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [lastScanned, setLastScanned] = useState<{ name: string; status: 'success' | 'error'; message: string } | null>(null);
+  const isProcessing = React.useRef(false); // Ref for immediate lock
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const { sessionId, courseName, courseCode, week } = params;
+  const { user } = useAuth();
 
   useEffect(() => {
     console.log('ScanScreen mounted');
+    return () => {
+      isProcessing.current = false;
+    };
   }, []);
 
   if (!permission) {
@@ -48,100 +59,182 @@ export default function ScanScreen() {
   }
 
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
-    if (scanned || processing) {
+    // Immediate lock check using ref
+    if (scanned || processing || isProcessing.current) {
       return;
     }
 
     console.log('QR code scanned:', { type, data });
+    isProcessing.current = true;
     setScanned(true);
     setProcessing(true);
 
     try {
       // Parse QR data
-      const qrData = JSON.parse(data);
+      let qrData;
+      try {
+        qrData = JSON.parse(data);
+      } catch (e) {
+        throw new Error('Invalid QR Code format');
+      }
+
       console.log('Parsed QR data:', qrData);
 
-      // TODO: Backend Integration - POST /api/lecturer/sessions/:id/scan with { qrData }
       // Validate timestamp is within 30 seconds
       const qrTimestamp = new Date(qrData.timestamp).getTime();
       const now = new Date().getTime();
       const diffSeconds = (now - qrTimestamp) / 1000;
 
       if (diffSeconds > 30) {
-        Alert.alert('QR Code Expired', 'This QR code is too old. Please ask the student to refresh their QR code.');
-        setScanned(false);
-        setProcessing(false);
+        setLastScanned({
+          name: qrData.name || 'Student',
+          status: 'error',
+          message: 'QR Code Expired. Please ask student to refresh.',
+        });
         return;
       }
 
-      // Mock successful scan
-      Alert.alert(
-        'Attendance Marked',
-        `${qrData.name} (${qrData.studentId}) has been marked present.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setScanned(false);
-              setProcessing(false);
-            },
-          },
-        ]
-      );
-    } catch (error) {
+      let activeSessionId = sessionId as string;
+
+      // If no session ID passed, find active session
+      if (!activeSessionId) {
+        const { data: sessionData, error: sessionError } = await supabase
+          .from('attendance_sessions')
+          .select('id')
+          .eq('lecturer_id', user?.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sessionError || !sessionData) {
+          console.error('Session error or no session:', sessionError);
+          setLastScanned({
+            name: 'System',
+            status: 'error',
+            message: 'No active session found. Create one first.',
+          });
+          return;
+        }
+        activeSessionId = sessionData.id;
+      }
+
+      // Insert record
+      const { error: insertError } = await supabase
+        .from('attendance_records')
+        .insert({
+          session_id: activeSessionId,
+          student_id: qrData.studentId, // Ensure QR data maps to user id
+          status: 'present',
+          scan_time: new Date().toISOString()
+        });
+
+      if (insertError) {
+        // Check for duplicate (already scanned)
+        if (insertError.code === '23505') { // Unique violation
+          setLastScanned({
+            name: qrData.name,
+            status: 'error',
+            message: 'Already marked present.'
+          });
+        } else {
+          throw insertError;
+        }
+      } else {
+        setLastScanned({
+          name: qrData.name,
+          status: 'success',
+          message: 'Attendance marked successfully.'
+        });
+      }
+
+    } catch (error: any) {
       console.error('Error processing QR code:', error);
-      Alert.alert('Invalid QR Code', 'The scanned QR code is not valid for attendance.');
-      setScanned(false);
+      setLastScanned({
+        name: 'Unknown',
+        status: 'error',
+        message: error.message || 'Failed to process scan.'
+      });
+    } finally {
       setProcessing(false);
+      // isProcessing.current remains true until user resets
     }
+  };
+
+  const handleScanNext = () => {
+    setLastScanned(null);
+    setScanned(false);
+    setProcessing(false);
+    isProcessing.current = false;
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
+        <BackButton
           onPress={() => {
             console.log('User tapped back button');
             router.back();
           }}
-        >
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
+        />
         <Text style={styles.headerTitle}>Scan QR Code</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <View style={styles.cameraContainer}>
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ['qr'],
-          }}
-        />
-        <View style={styles.overlay}>
-          <View style={styles.scanArea}>
-            <View style={[styles.corner, styles.cornerTopLeft]} />
-            <View style={[styles.corner, styles.cornerTopRight]} />
-            <View style={[styles.corner, styles.cornerBottomLeft]} />
-            <View style={[styles.corner, styles.cornerBottomRight]} />
-          </View>
+      {courseName && (
+        <View style={styles.sessionInfo}>
+          <Text style={styles.sessionInfoText}>
+            {courseCode} {courseName}
+          </Text>
+          {week && <Text style={styles.sessionInfoSubText}>Week {week}</Text>}
         </View>
-      </View>
+      )}
 
-      <View style={styles.instructions}>
-        <Text style={styles.instructionsTitle}>Position QR code within frame</Text>
-        <Text style={styles.instructionsText}>
-          The QR code will be scanned automatically
-        </Text>
+      <View style={styles.cameraContainer}>
+        {!lastScanned ? (
+          <>
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr'],
+              }}
+            />
+            <View style={styles.overlay}>
+              <View style={styles.scanArea}>
+                <View style={[styles.corner, styles.cornerTopLeft]} />
+                <View style={[styles.corner, styles.cornerTopRight]} />
+                <View style={[styles.corner, styles.cornerBottomLeft]} />
+                <View style={[styles.corner, styles.cornerBottomRight]} />
+              </View>
+            </View>
+            <View style={styles.instructions}>
+              <Text style={styles.instructionsTitle}>Position QR code within frame</Text>
+              <Text style={styles.instructionsText}>
+                The QR code will be scanned automatically
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.resultContainer}>
+            <IconSymbol
+              ios_icon_name={lastScanned.status === 'success' ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
+              android_material_icon_name={lastScanned.status === 'success' ? 'check-circle' : 'error'}
+              size={80}
+              color={lastScanned.status === 'success' ? colors.primary : colors.error}
+            />
+            <Text style={styles.resultTitle}>
+              {lastScanned.status === 'success' ? 'Success!' : 'Error'}
+            </Text>
+            <Text style={styles.resultName}>{lastScanned.name}</Text>
+            <Text style={styles.resultMessage}>{lastScanned.message}</Text>
+
+            <TouchableOpacity style={styles.scanNextButton} onPress={handleScanNext}>
+              <Text style={styles.scanNextButtonText}>Scan Next Student</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {processing && (
@@ -293,5 +386,58 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textDark,
     marginTop: spacing.md,
+  },
+  sessionInfo: {
+    padding: spacing.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  sessionInfoText: {
+    ...typography.body,
+    color: colors.textDark,
+    fontWeight: '600',
+  },
+  sessionInfoSubText: {
+    ...typography.bodySmall,
+    color: colors.textDark,
+    marginTop: 2,
+  },
+  resultContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    zIndex: 10,
+  },
+  resultTitle: {
+    ...typography.h2,
+    color: colors.text,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  resultName: {
+    ...typography.h3,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  resultMessage: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  scanNextButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.md,
+  },
+  scanNextButtonText: {
+    ...typography.body,
+    color: colors.textDark,
+    fontWeight: '600',
   },
 });

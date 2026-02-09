@@ -133,33 +133,8 @@ export default function DashboardScreen() {
 
         <View style={styles.quickActions}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => {
-              console.log('User tapped Scan QR Code button');
-              router.push('/scan');
-            }}
-          >
-            <View style={styles.actionIconContainer}>
-              <IconSymbol
-                ios_icon_name="qrcode.viewfinder"
-                android_material_icon_name="qr-code-scanner"
-                size={28}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Scan QR Code</Text>
-              <Text style={styles.actionDescription}>Mark attendance by scanning student QR</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
+
+
 
           <TouchableOpacity
             style={styles.actionCard}

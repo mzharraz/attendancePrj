@@ -13,6 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
+import { BackButton } from '@/components/BackButton';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -28,19 +31,25 @@ export default function CreateSessionScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingCourses, setLoadingCourses] = useState(true);
 
+  const { user } = useAuth();
+
   useEffect(() => {
     console.log('CreateSessionScreen mounted');
-    // TODO: Backend Integration - GET /api/lecturer/courses to get courses list
-    // Mock data for now
     const fetchCourses = async () => {
       setLoadingCourses(true);
       try {
         console.log('Fetching courses...');
-        setCourses([
-          { id: '1', name: 'Computer Science 101', code: 'CS101' },
-          { id: '2', name: 'Data Structures', code: 'CS201' },
-          { id: '3', name: 'Algorithms', code: 'CS301' },
-        ]);
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('courses')
+          .select('id, name, code')
+          .eq('lecturer_id', user.id);
+
+        if (error) throw error;
+
+        console.log('Fetched courses:', data);
+        setCourses(data || []);
       } catch (error) {
         console.error('Error fetching courses:', error);
       } finally {
@@ -49,25 +58,72 @@ export default function CreateSessionScreen() {
     };
 
     fetchCourses();
-  }, []);
+  }, [user]);
 
   const handleCreateSession = async () => {
     console.log('User tapped Create Session button');
-    if (!selectedCourse) {
-      console.log('No course selected');
+    if (!selectedCourse || !user) {
+      console.log('No course selected or no user');
       return;
     }
 
     setLoading(true);
     try {
       console.log('Creating session:', { selectedCourse, week, date, time });
-      // TODO: Backend Integration - POST /api/lecturer/sessions with { courseId, week, date, time }
-      // Mock success
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Session created successfully');
-      router.back();
+
+      const sessionDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      const sessionTime = time.toLocaleTimeString([], { hour12: false }); // HH:MM:SS
+
+      const { data, error } = await supabase
+        .from('attendance_sessions')
+        .insert({
+          course_id: selectedCourse,
+          lecturer_id: user.id,
+          week: parseInt(week),
+          date: sessionDate,
+          time: sessionTime,
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      let sessionData = data;
+
+      if (error) {
+        if (error.code === '23505') { // Unique violation
+          console.log('Session already exists, fetching existing session...');
+          if (!user) return; // Should not happen given early return
+          const { data: existingSession, error: fetchError } = await supabase
+            .from('attendance_sessions')
+            .select()
+            .eq('course_id', selectedCourse)
+            .eq('week', parseInt(week))
+            .eq('date', sessionDate)
+            .single();
+
+          if (fetchError) throw fetchError;
+          sessionData = existingSession;
+        } else {
+          throw error;
+        }
+      }
+
+      console.log('Session active:', sessionData);
+
+      // Get the selected course details
+      const course = courses.find(c => c.id === selectedCourse);
+
+      router.replace({
+        pathname: '/scan',
+        params: {
+          sessionId: sessionData.id,
+          courseName: course?.name || 'Unknown Course',
+          courseCode: course?.code || '',
+          week: week
+        }
+      });
     } catch (error) {
-      console.error('Error creating session:', error);
+      console.error('Error creating/fetching session:', error);
     } finally {
       setLoading(false);
     }
@@ -79,21 +135,12 @@ export default function CreateSessionScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
+        <BackButton
           onPress={() => {
             console.log('User tapped back button');
             router.back();
           }}
-        >
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
+        />
         <Text style={styles.headerTitle}>New Session</Text>
         <View style={styles.headerSpacer} />
       </View>

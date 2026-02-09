@@ -42,7 +42,8 @@
           "microphonePermission": "Allow AttendEase to access your microphone",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "scheme": "natively",
     "experiments": {
@@ -53,6 +54,5 @@
       "supabaseUrl": "https://gneisngrdqmugibdmzig.supabase.co",
       "supabaseAnonKey": "sb_publishable_ABCwGUZjk2CqMQPY3s1sVw_UlF9qQjH"
     }
-  },
-  "scheme": "AttendEase"
+  }
 }

@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
+import { BackButton } from '@/components/BackButton';
 import { colors, spacing, typography } from '@/styles/commonStyles';
 
 export default function SessionDetailsScreen() {
@@ -12,21 +13,12 @@ export default function SessionDetailsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
+        <BackButton
           onPress={() => {
             console.log('User tapped back button');
             router.back();
           }}
-        >
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
+        />
         <Text style={styles.headerTitle}>Session Details</Text>
         <View style={styles.headerSpacer} />
       </View>

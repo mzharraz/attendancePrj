@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
+import { BackButton } from '@/components/BackButton';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 
 export default function StudentQRScreen() {
@@ -21,14 +22,15 @@ export default function StudentQRScreen() {
       return;
     }
 
-    // TODO: Backend Integration - GET /api/student/qr to get { studentId, name, timestamp, qrData }
-    // For now, generate QR data locally
+    // Generate QR data using real user info
     const generateQRData = () => {
+      if (!user) return;
+
       const now = new Date();
       const timestampValue = now.toISOString();
       const data = JSON.stringify({
-        studentId: user?.email || 'STUDENT123', // Replace with actual studentId from backend
-        name: user?.name || 'Student Name',
+        studentId: user.id, // Use Auth ID for database linking
+        name: user.name || user.email || 'Student',
         timestamp: timestampValue,
       });
       setQrData(data);
@@ -51,12 +53,15 @@ export default function StudentQRScreen() {
   }
 
   const userName = user?.name || 'Student';
-  const userEmail = user?.email || '';
+  const studentId = user?.student_id || user?.email || '';
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <BackButton />
+          </View>
           <Text style={styles.title}>Your QR Code</Text>
           <Text style={styles.subtitle}>Show this to your lecturer for attendance</Text>
         </View>
@@ -84,7 +89,7 @@ export default function StudentQRScreen() {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Student ID</Text>
-            <Text style={styles.infoValue}>{userEmail}</Text>
+            <Text style={styles.infoValue}>{studentId}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
@@ -94,9 +99,7 @@ export default function StudentQRScreen() {
         </View>
 
         <View style={styles.notice}>
-          <Text style={styles.noticeText}>
-            ⚠️ This QR code refreshes every 5 seconds for security
-          </Text>
+
           <Text style={styles.noticeSubtext}>
             Screenshots will not work for attendance
           </Text>
@@ -124,6 +127,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: spacing.xl,
+  },
+  headerTop: {
+    width: '100%',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
   },
   title: {
     ...typography.h2,
@@ -188,12 +196,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: colors.warning,
   },
-  noticeText: {
-    ...typography.bodySmall,
-    color: colors.text,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
+
   noticeSubtext: {
     ...typography.caption,
     color: colors.textSecondary,
