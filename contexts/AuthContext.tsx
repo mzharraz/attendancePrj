@@ -42,16 +42,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Get user role from the user table
           const { data: userData, error: userError } = await supabase
             .from('user')
-            .select('role, student_id')
+            .select('role, student_id, name')
             .eq('id', session.user.id)
             .single();
 
           console.log('Fetched user data from database:', { userData, userError });
 
+          let userName = userData?.name;
+          const metaName = session.user.user_metadata?.name;
+
+          // Sync: If DB name is missing but Auth name exists, update DB
+          if (!userName && metaName) {
+            console.log('Syncing name to database:', metaName);
+            const { error: updateError } = await supabase
+              .from('user')
+              .update({ name: metaName })
+              .eq('id', session.user.id);
+
+            if (!updateError) {
+              userName = metaName;
+            } else {
+              console.error('Error syncing name:', updateError);
+            }
+          }
+
           setUser({
             id: session.user.id,
             email: session.user.email || '',
-            name: session.user.user_metadata?.name,
+            name: userName || metaName, // Prefer DB/Synced name, fallback to meta
             image: session.user.user_metadata?.avatar_url,
             role: userData?.role || 'student',
             student_id: userData?.student_id,
@@ -76,16 +94,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Get user role from the user table
         const { data: userData, error: userError } = await supabase
           .from('user')
-          .select('role, student_id')
+          .select('role, student_id, name')
           .eq('id', session.user.id)
           .single();
 
         console.log('Fetched user data from database (fetchUser):', { userData, userError });
 
+        let userName = userData?.name;
+        const metaName = session.user.user_metadata?.name;
+
+        // Sync: If DB name is missing but Auth name exists, update DB
+        if (!userName && metaName) {
+          console.log('Syncing name to database (fetchUser):', metaName);
+          const { error: updateError } = await supabase
+            .from('user')
+            .update({ name: metaName })
+            .eq('id', session.user.id);
+
+          if (!updateError) {
+            userName = metaName;
+          } else {
+            console.error('Error syncing name:', updateError);
+          }
+        }
+
         setUser({
           id: session.user.id,
           email: session.user.email || '',
-          name: session.user.user_metadata?.name,
+          name: userName || metaName,
           image: session.user.user_metadata?.avatar_url,
           role: userData?.role || 'student',
           student_id: userData?.student_id,

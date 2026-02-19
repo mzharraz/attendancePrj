@@ -9,7 +9,7 @@ import { BackButton } from '@/components/BackButton';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 
 export default function StudentQRScreen() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const [qrData, setQrData] = useState('');
   const [timestamp, setTimestamp] = useState('');
@@ -60,7 +60,10 @@ export default function StudentQRScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <BackButton />
+            <BackButton label="Log Out" onPress={() => {
+              signOut();
+              router.replace('/auth');
+            }} />
           </View>
           <Text style={styles.title}>Your QR Code</Text>
           <Text style={styles.subtitle}>Show this to your lecturer for attendance</Text>
