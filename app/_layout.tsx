@@ -81,37 +81,38 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="auto" animated />
-        <ThemeProvider
-          value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
-        >
-          <AuthProvider>
-            <WidgetProvider>
-              <GestureHandlerRootView>
+      <ThemeProvider
+        value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
+      >
+        <AuthProvider>
+          <WidgetProvider>
+            <GestureHandlerRootView>
               <Stack>
                 {/* Index route - handles initial auth check and routing */}
                 <Stack.Screen name="index" options={{ headerShown: false }} />
-                
+
                 {/* Auth screens */}
                 <Stack.Screen name="auth" options={{ headerShown: false }} />
                 <Stack.Screen name="auth-popup" options={{ headerShown: false }} />
                 <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
-                
+
                 {/* Main app with tabs */}
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                
+
                 {/* Student QR screen */}
                 <Stack.Screen name="student-qr" options={{ headerShown: false }} />
-                
+
                 {/* Lecturer screens (outside tabs to avoid FloatingTabBar blocking camera) */}
                 <Stack.Screen name="scan" options={{ headerShown: false }} />
                 <Stack.Screen name="create-session" options={{ headerShown: false }} />
                 <Stack.Screen name="session-details" options={{ headerShown: false }} />
+                <Stack.Screen name="export-data" options={{ headerShown: false }} />
               </Stack>
               <SystemBars style={"auto"} />
-              </GestureHandlerRootView>
-            </WidgetProvider>
-          </AuthProvider>
-        </ThemeProvider>
+            </GestureHandlerRootView>
+          </WidgetProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </>
   );
 }

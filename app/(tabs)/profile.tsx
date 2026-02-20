@@ -67,26 +67,7 @@ export default function ProfileScreen() {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <IconSymbol
-                ios_icon_name="bell.fill"
-                android_material_icon_name="notifications"
-                size={24}
-                color={colors.accent}
-              />
-            </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>Notifications</Text>
-              <Text style={styles.menuDescription}>Manage notification preferences</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
+
         </View>
 
         <View style={styles.section}>

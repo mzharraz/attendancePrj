@@ -180,6 +180,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // 3. Insert courses if role is lecturer and courses are provided
         if (role === 'lecturer' && courses && courses.length > 0) {
+          console.log('Attempting to insert courses:', courses);
+          console.log('Current Auth User ID:', authData.user?.id);
+
           const coursesToInsert = courses.map(course => ({
             lecturer_id: authData.user!.id,
             name: course.name,
@@ -194,7 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error('Error inserting courses:', coursesError);
             // Optionally throw error or just log it?
             // Prioritizing user creation success over course creation failure for now, could act as a partial success
+          } else {
+            console.log('Courses inserted successfully');
           }
+        } else {
+          console.log('No courses to insert. Role:', role, 'Courses length:', courses?.length);
         }
       }
     } catch (error) {

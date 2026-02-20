@@ -95,7 +95,14 @@ export default function AuthScreen() {
           return;
         }
 
-        await signUpWithEmail(email, password, name, studentId, role, courses);
+        let finalCourses = [...courses];
+        // Auto-add pending course if user forgot to click '+'
+        if (role === 'lecturer' && courseName.trim() && courseCode.trim()) {
+          console.log('Auto-adding pending course:', courseName, courseCode);
+          finalCourses.push({ name: courseName.trim(), code: courseCode.trim() });
+        }
+
+        await signUpWithEmail(email, password, name, studentId, role, finalCourses);
         console.log('Signup successful');
         // Navigation will be handled by useEffect when user state updates
       }

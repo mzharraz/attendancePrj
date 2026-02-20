@@ -86,7 +86,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerTextContainer}>
             <Text style={styles.greeting}>{greetingText}</Text>
             <Text style={styles.subtitle}>Attendance Dashboard</Text>
           </View>
@@ -180,7 +180,7 @@ export default function DashboardScreen() {
             style={styles.actionCard}
             onPress={() => {
               console.log('User tapped Export Data button');
-              // TODO: Navigate to export screen
+              router.push('/export-data');
             }}
           >
             <View style={styles.actionIconContainer}>
@@ -232,6 +232,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.xl,
+  },
+  headerTextContainer: {
+    flex: 1,
+    paddingRight: spacing.md,
   },
   greeting: {
     ...typography.h2,
