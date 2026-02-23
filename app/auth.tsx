@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,7 +135,12 @@ export default function AuthScreen() {
         >
           <View style={styles.content}>
             <View style={styles.header}>
-              <Text style={styles.title}>Attendance System</Text>
+              <Image
+                source={require('@/assets/images/logo1.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.title}>ScanLect</Text>
               <Text style={styles.subtitle}>
                 {isLogin ? 'Sign in to continue' : 'Create your account'}
               </Text>
@@ -303,6 +309,11 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: spacing.xl,
     alignItems: 'center',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: spacing.md,
   },
   title: {
     ...typography.h1,

@@ -1,49 +1,49 @@
 import { StyleSheet } from 'react-native';
 
-// Attendance App Theme - Professional Education Colors
+// ScanLect Theme - Professional Education Colors
 export const colors = {
   // Primary - Deep Blue (Trust, Education)
   primary: '#2563EB',
   primaryDark: '#1E40AF',
   primaryLight: '#3B82F6',
-  
+
   // Secondary - Emerald Green (Success, Present)
   secondary: '#10B981',
   secondaryDark: '#059669',
   secondaryLight: '#34D399',
-  
+
   // Accent - Amber (Attention, Active)
   accent: '#F59E0B',
   accentDark: '#D97706',
   accentLight: '#FBBF24',
-  
+
   // Status Colors
   success: '#10B981',
   error: '#EF4444',
   warning: '#F59E0B',
   info: '#3B82F6',
-  
+
   // Backgrounds
   background: '#F9FAFB',
   backgroundDark: '#111827',
   card: '#FFFFFF',
   cardDark: '#1F2937',
-  
+
   // Text
   text: '#111827',
   textSecondary: '#6B7280',
   textLight: '#9CA3AF',
   textDark: '#FFFFFF',
   textSecondaryDark: '#D1D5DB',
-  
+
   // Borders
   border: '#E5E7EB',
   borderDark: '#374151',
-  
+
   // Highlights
   highlight: '#EEF2FF',
   highlightDark: '#312E81',
-  
+
   // Additional
   grey: '#90CAF9',
   backgroundAlt: '#162133',

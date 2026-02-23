@@ -30,7 +30,7 @@ export default function PrivacyPolicyScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>1. Introduction</Text>
                     <Text style={styles.paragraph}>
-                        Welcome to the Attendance App ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience on our mobile application.
+                        Welcome to ScanLect ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience on our mobile application.
                     </Text>
                 </View>
 

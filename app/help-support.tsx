@@ -35,11 +35,11 @@ export default function HelpSupportScreen() {
             <View style={styles.content}>
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('@/assets/images/final_quest_240x240.png')}
+                        source={require('@/assets/images/logo1.png')}
                         style={styles.logo}
                         resizeMode="contain"
                     />
-                    <Text style={styles.appName}>Attendance App</Text>
+                    <Text style={styles.appName}>ScanLect</Text>
                     <Text style={styles.appVersion}>Version 1.0.0</Text>
                 </View>
 

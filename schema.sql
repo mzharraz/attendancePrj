@@ -1,4 +1,4 @@
--- Create tables for the attendance system
+-- Create tables for the ScanLect system
 -- NOTE: This assumes a 'user' table already exists in the public schema.
 
 -- 1. Courses Table

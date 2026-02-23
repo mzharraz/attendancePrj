@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "AttendEase",
-    "slug": "AttendEase",
+    "name": "ScanLect",
+    "slug": "ScanLect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natively-dark.png",
+    "icon": "./assets/images/logo1.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/natively-dark.png",
+      "image": "./assets/images/logo1.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,14 +21,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/natively-dark.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/logo1.png",
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.Natively"
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
+      "favicon": "./assets/images/logo1.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -38,8 +38,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow AttendEase to access your camera for scanning QR codes",
-          "microphonePermission": "Allow AttendEase to access your microphone",
+          "cameraPermission": "Allow ScanLect to access your camera for scanning QR codes",
+          "microphonePermission": "Allow ScanLect to access your microphone",
           "recordAudioAndroid": false
         }
       ],
