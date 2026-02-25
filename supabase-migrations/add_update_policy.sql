@@ -1,0 +1,1 @@
+create policy "Lecturers can update records for their sessions" on public.attendance_records for update to authenticated using (exists (select 1 from public.attendance_sessions s where s.id = session_id and s.lecturer_id = auth.uid()::text));

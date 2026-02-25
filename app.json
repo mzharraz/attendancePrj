@@ -25,7 +25,10 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively"
+      "package": "com.anonymous.Natively",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/images/logo1.png",
@@ -52,7 +55,10 @@
     "extra": {
       "router": {},
       "supabaseUrl": "https://gneisngrdqmugibdmzig.supabase.co",
-      "supabaseAnonKey": "sb_publishable_ABCwGUZjk2CqMQPY3s1sVw_UlF9qQjH"
+      "supabaseAnonKey": "sb_publishable_ABCwGUZjk2CqMQPY3s1sVw_UlF9qQjH",
+      "eas": {
+        "projectId": "65bb673e-95ee-4ce2-9dc5-396be205aed4"
+      }
     }
   }
 }

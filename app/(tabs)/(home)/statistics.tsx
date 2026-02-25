@@ -37,6 +37,10 @@ export default function StatisticsScreen() {
     const [selectedWeek, setSelectedWeek] = useState<number>(1);
     const [showCourseModal, setShowCourseModal] = useState(false);
 
+    // Status Modal State
+    const [statusModalVisible, setStatusModalVisible] = useState(false);
+    const [selectedRecord, setSelectedRecord] = useState<{ sessionId: string; studentId: string; name: string; currentStatus: string } | null>(null);
+
     // Data State
     const [sessionsList, setSessionsList] = useState<SessionData[]>([]);
     const [sessionFound, setSessionFound] = useState<boolean | null>(null); // null = loading/init, true, false
@@ -197,6 +201,53 @@ export default function StatisticsScreen() {
         );
     };
 
+    const handleUpdateAttendance = async (newStatus: string) => {
+        if (!selectedRecord) return;
+        
+        try {
+            setLoading(true);
+            setStatusModalVisible(false);
+
+            // Check if an attendance record already exists
+            const { data: existingRecords, error: fetchError } = await supabase
+                .from('attendance_records')
+                .select('id')
+                .eq('session_id', selectedRecord.sessionId)
+                .eq('student_id', selectedRecord.studentId);
+
+            if (fetchError) throw fetchError;
+
+            if (existingRecords && existingRecords.length > 0) {
+                // Update
+                const { error: updateError } = await supabase
+                    .from('attendance_records')
+                    .update({ status: newStatus })
+                    .eq('id', existingRecords[0].id);
+                    
+                if (updateError) throw updateError;
+            } else {
+                // Insert
+                const { error: insertError } = await supabase
+                    .from('attendance_records')
+                    .insert({
+                        session_id: selectedRecord.sessionId,
+                        student_id: selectedRecord.studentId,
+                        status: newStatus,
+                        scan_time: new Date().toISOString()
+                    });
+                    
+                if (insertError) throw insertError;
+            }
+
+            // Refresh data
+            fetchSessionAndAttendance();
+        } catch (error) {
+            console.error('Error updating attendance:', error);
+            Alert.alert('Error', 'Failed to update attendance status.');
+            setLoading(false);
+        }
+    };
+
     // --- Render Components ---
 
     const renderCourseSelector = () => (
@@ -261,8 +312,19 @@ export default function StatisticsScreen() {
         }
     };
 
-    const renderStudentItem = ({ item }: { item: StudentAttendance }) => {
+    const renderStudentItem = ({ item, sessionId }: { item: StudentAttendance, sessionId?: string }) => {
         const statusColor = getStatusColor(item.status);
+
+        const handleStatusPress = () => {
+            if (!sessionId) return;
+            setSelectedRecord({
+                sessionId,
+                studentId: item.student_id,
+                name: item.name,
+                currentStatus: item.status
+            });
+            setStatusModalVisible(true);
+        };
 
         return (
             <View style={styles.studentRow}>
@@ -271,9 +333,13 @@ export default function StatisticsScreen() {
                     <Text style={styles.studentId}>{item.student_number}</Text>
                 </View>
                 <View style={styles.statusContainer}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                        <Text style={[styles.statusText, { color: statusColor }]}>{item.status.toUpperCase()}</Text>
-                    </View>
+                    <TouchableOpacity 
+                        style={[styles.statusBadge, { backgroundColor: statusColor + '20', flexDirection: 'row', alignItems: 'center' }]}
+                        onPress={handleStatusPress}
+                    >
+                        <Text style={[styles.statusText, { color: statusColor, marginRight: 2 }]}>{item.status.toUpperCase()}</Text>
+                        <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="arrow-drop-down" size={12} color={statusColor} />
+                    </TouchableOpacity>
                     {item.scan_time ? (
                         <Text style={styles.timeText}>
                             {new Date(item.scan_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -344,7 +410,7 @@ export default function StatisticsScreen() {
                             ) : (
                                 <FlatList
                                     data={session.attendance}
-                                    renderItem={renderStudentItem}
+                                    renderItem={({ item }) => renderStudentItem({ item, sessionId: session.id })}
                                     keyExtractor={(item) => item.student_id}
                                     scrollEnabled={false}
                                     ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -366,6 +432,58 @@ export default function StatisticsScreen() {
                     {renderWeekSelector()}
                     {renderContent()}
                 </ScrollView>
+
+                {/* Status Selection Modal */}
+                <Modal
+                    visible={statusModalVisible}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setStatusModalVisible(false)}
+                >
+                    <Pressable style={styles.modalOverlay} onPress={() => setStatusModalVisible(false)}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <View>
+                                    <Text style={styles.modalTitle}>Update Status</Text>
+                                    {selectedRecord && (
+                                        <Text style={styles.modalSubtitle}>{selectedRecord.name}</Text>
+                                    )}
+                                </View>
+                                <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
+                                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="close" size={24} color={colors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
+                            
+                            {['present', 'absent'].map((statusOption) => (
+                                <TouchableOpacity
+                                    key={statusOption}
+                                    style={[
+                                        styles.modalItem,
+                                        selectedRecord?.currentStatus === statusOption && styles.modalItemSelected
+                                    ]}
+                                    onPress={() => handleUpdateAttendance(statusOption)}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={[
+                                            styles.statusDot, 
+                                            { backgroundColor: getStatusColor(statusOption) }
+                                        ]} />
+                                        <Text style={[
+                                            styles.modalItemText,
+                                            selectedRecord?.currentStatus === statusOption && styles.modalItemTextSelected,
+                                            { textTransform: 'capitalize' }
+                                        ]}>
+                                            {statusOption}
+                                        </Text>
+                                    </View>
+                                    {selectedRecord?.currentStatus === statusOption && (
+                                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={colors.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </Pressable>
+                </Modal>
 
                 {/* Course Selection Modal */}
                 <Modal
@@ -619,6 +737,17 @@ const styles = StyleSheet.create({
     },
     modalTitle: {
         ...typography.h3,
+    },
+    modalSubtitle: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        marginTop: 2,
+    },
+    statusDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: spacing.sm,
     },
     modalItem: {
         flexDirection: 'row',
