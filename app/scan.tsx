@@ -9,6 +9,7 @@ import { BackButton } from '@/components/BackButton';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
+import { Audio } from 'expo-av';
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -27,6 +28,24 @@ export default function ScanScreen() {
       isProcessing.current = false;
     };
   }, []);
+
+  const playSuccessSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require('@/assets/sounds/ding.mp3')
+      );
+      await sound.playAsync();
+      
+      // Unload after playing
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if ('didJustFinish' in status && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (error) {
+      console.log('Error playing sound:', error);
+    }
+  };
 
   if (!permission) {
     return (
@@ -146,6 +165,8 @@ export default function ScanScreen() {
           status: 'success',
           message: 'Attendance marked successfully.'
         });
+        
+        playSuccessSound();
       }
 
     } catch (error: any) {

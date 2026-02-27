@@ -1,67 +1,156 @@
-
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, Image, Dimensions, RefreshControl } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 
+const { width } = Dimensions.get('window');
+
 export default function DashboardScreen() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  
   const [dashboardData, setDashboardData] = useState({
     ongoingSessions: 0,
     todayScans: 0,
     lecturerName: '',
   });
+  const [coursesList, setCoursesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('Week 1');
+
+  const fetchDashboard = useCallback(async (selectedWeek: string) => {
+    try {
+      // Fetch total student count for "Total Students" (all enrolled students)
+      const { count: studentCount } = await supabase
+        .from('user')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'student');
+
+      // Fetch ALL created sessions count for this lecturer's courses
+      // First, get the courses to filter by this user's courses
+      const { data: userCourses } = await supabase
+        .from('courses')
+        .select('id');
+        
+      let sessionsCount = 0;
+      if (userCourses && userCourses.length > 0) {
+        const courseIds = userCourses.map(c => c.id);
+        const { count } = await supabase
+          .from('attendance_sessions')
+          .select('*', { count: 'exact', head: true })
+          .in('course_id', courseIds);
+        
+        sessionsCount = count || 0;
+      }
+
+      // Extract week number from string "Week 1", etc.
+      const weekNumber = parseInt(selectedWeek.replace('Week ', ''), 10);
+
+      // Fetch courses for the list
+      const { data: coursesData } = await supabase
+        .from('courses')
+        .select('id, name, code')
+        .limit(5);
+
+      const mappedCourses = await Promise.all((coursesData || []).map(async (c, index) => {
+        // Find sessions for this course AND this specific week
+        const { data: sessions } = await supabase
+          .from('attendance_sessions')
+          .select('id')
+          .eq('course_id', c.id)
+          .eq('week', weekNumber);
+
+        let presentCount = 0;
+        // Enrolled students in the system (like in statistics.tsx)
+        const totalEnrolled = studentCount || 0; 
+
+        if (sessions && sessions.length > 0) {
+          const sessionIds = sessions.map(s => s.id);
+          
+          // Get all records for these sessions
+          const { data: records } = await supabase
+            .from('attendance_records')
+            .select('status')
+            .in('session_id', sessionIds);
+
+          if (records) {
+             presentCount = records.filter(r => r.status === 'present').length;
+          }
+        }
+
+        // Calculate percentage according to new requirement: (present / total students) * 100
+        let calcPercentage = 0;
+        if (totalEnrolled > 0) {
+            calcPercentage = Math.round((presentCount / totalEnrolled) * 100);
+        }
+        
+        // Determine color based on percentage
+        let percentColor = '#22C55E'; // green 71-100%
+        if (calcPercentage <= 10) percentColor = '#EF4444'; // red 0-10%
+        else if (calcPercentage <= 30) percentColor = '#F97316'; // orange 11-30%
+        else if (calcPercentage <= 50) percentColor = '#EAB308'; // yellow 31-50%
+        else if (calcPercentage <= 70) percentColor = '#84CC16'; // lime 51-70%
+        
+        // Show the actual number of enrolled students as total
+        const displayTotal = totalEnrolled;
+
+        return {
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          percentage: calcPercentage,
+          current: presentCount,
+          total: displayTotal,
+          color: percentColor,
+          badgeText: `${calcPercentage}% ↑`,
+          isWeekBadge: false
+        };
+      }));
+
+      // Set state
+      setDashboardData({
+        ongoingSessions: sessionsCount || 0,
+        todayScans: studentCount || 0,
+        lecturerName: user?.name || 'Lecturer', 
+      });
+      
+      setCoursesList(mappedCourses);
+
+    } catch (error) {
+      console.error('Error fetching dashboard:', error);
+    }
+  }, [user]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    await fetchDashboard(activeTab);
+    setLoading(false);
+  }, [fetchDashboard, activeTab]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDashboard(activeTab);
+    setRefreshing(false);
+  }, [fetchDashboard, activeTab]);
 
   useEffect(() => {
-    console.log('DashboardScreen mounted/updated. User:', user ? user.id : 'null', 'AuthLoading:', authLoading);
     if (!authLoading && !user) {
-      console.log('No user found, redirecting to auth');
       router.replace('/auth');
       return;
     }
 
-    // TODO: Backend Integration - GET /api/lecturer/dashboard to get { ongoingSessions, todayScans, lecturerName }
-    // For now, use mock data
-    const fetchDashboard = async () => {
-      console.log('fetchDashboard called');
-      setLoading(true);
-      try {
-        console.log('Fetching dashboard data...');
-
-        // Fetch total students count
-        const { count, error } = await supabase
-          .from('user')
-          .select('*', { count: 'exact', head: true })
-          .eq('role', 'student');
-
-        if (error) {
-          console.error('Error fetching student count:', error);
-        }
-
-        // Mock data for other fields, but use real student count
-        setDashboardData({
-          ongoingSessions: 2,
-          todayScans: count || 0,
-          lecturerName: user?.name || 'Lecturer',
-        });
-      } catch (error) {
-        console.error('Error fetching dashboard:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboard();
-  }, [user, authLoading, router]);
+    if (user) {
+      loadData();
+    }
+  }, [user, authLoading, router, loadData]);
 
   const handleSignOut = async () => {
-    console.log('User tapped Sign Out button');
     try {
       await signOut();
       router.replace('/auth');
@@ -70,276 +159,452 @@ export default function DashboardScreen() {
     }
   };
 
-  if (authLoading || loading) {
+  // Generate mock bar chart bars for a course
+  const renderMockBars = (isWarning: boolean) => {
+    const bars = [0.4, 0.7, 0.3, 0.9, 0.6, 0.8, 0.4, 0.5, 0.2, 0.7, 0.5, 0.8, 0.3];
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.chartRow}>
+        <Text style={styles.chartEllipsis}>...</Text>
+        <View style={styles.barsContainer}>
+          {bars.map((height, i) => {
+            let barColor = '#22C55E'; // green 71-100%
+            if (height <= 0.1) barColor = '#EF4444'; // red 0-10%
+            else if (height <= 0.3) barColor = '#F97316'; // orange 11-30%
+            else if (height <= 0.5) barColor = '#EAB308'; // yellow 31-50%
+            else if (height <= 0.7) barColor = '#84CC16'; // lime 51-70%
+            
+            if (i === 2 && isWarning) barColor = '#EF4444'; 
+            return (
+              <View 
+                key={i} 
+                style={[
+                  styles.chartBar, 
+                  { height: height * 24, backgroundColor: barColor }
+                ]} 
+              />
+            );
+          })}
+        </View>
       </View>
     );
-  }
-
-  const greetingText = `Hello, ${dashboardData.lecturerName}`;
-  const ongoingSessionsText = `${dashboardData.ongoingSessions}`;
-  const todayScansText = `${dashboardData.todayScans}`;
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.greeting}>{greetingText}</Text>
-            <Text style={styles.subtitle}>Attendance Dashboard</Text>
+    <View style={styles.container}>
+      <ScrollView 
+        bounces={true} 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
+        
+        {/* Header Section */}
+        <View style={[styles.headerBackground, { paddingTop: Math.max(insets.top, 16) }]}>
+          <View style={styles.headerTop}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoIconPlaceholder}>
+                <Image source={require('@/assets/images/logo1.png')} style={styles.logoImage} resizeMode="contain" />
+              </View>
+              <Text style={styles.logoText}>ScanLect</Text>
+            </View>
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity onPress={handleSignOut} style={styles.logoutButton}>
+                <IconSymbol ios_icon_name="rectangle.portrait.and.arrow.right" android_material_icon_name="logout" size={20} color="#FFFFFF" />
+                <Text style={styles.logoutText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-            <IconSymbol
-              ios_icon_name="rectangle.portrait.and.arrow.right"
-              android_material_icon_name="logout"
-              size={24}
-              color={colors.error}
-            />
-          </TouchableOpacity>
+          <Text style={styles.greetingHeader}>Welcome, {dashboardData.lecturerName}</Text>
         </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <IconSymbol
-                ios_icon_name="clock.fill"
-                android_material_icon_name="schedule"
-                size={32}
-                color={colors.primary}
-              />
+        <View style={styles.mainContent}>
+          <View style={styles.statsContainer}>
+            <View style={[styles.statCardBlue, { marginRight: spacing.sm }]}>
+              <Text style={styles.statTitle}>Ongoing Sessions</Text>
+              <Text style={styles.statValue}>{dashboardData.ongoingSessions}</Text>
+              <View style={styles.statWatermark}>
+                <IconSymbol ios_icon_name="barcode" android_material_icon_name="qr-code-scanner" size={72} color="rgba(255,255,255,0.15)" />
+              </View>
             </View>
-            <Text style={styles.statValue}>{ongoingSessionsText}</Text>
-            <Text style={styles.statLabel}>Ongoing Sessions</Text>
+            <View style={[styles.statCardBlue, { marginLeft: spacing.sm }]}>
+              <Text style={styles.statTitle}>Total Students</Text>
+              <Text style={styles.statValue}>{dashboardData.todayScans}</Text>
+              <View style={styles.statWatermark}>
+                <IconSymbol ios_icon_name="chart.bar.doc.horizontal" android_material_icon_name="grid-on" size={72} color="rgba(255,255,255,0.15)" />
+              </View>
+            </View>
           </View>
 
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <IconSymbol
-                ios_icon_name="person.2.fill"
-                android_material_icon_name="group"
-                size={32}
-                color={colors.secondary}
-              />
-            </View>
-            <Text style={styles.statValue}>{todayScansText}</Text>
-            <Text style={styles.statLabel}>Students Today</Text>
+          <TouchableOpacity
+            style={styles.primaryAction}
+            onPress={() => router.push('/create-session')}
+          >
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={20} color={colors.textDark} />
+            <Text style={styles.primaryActionText}>New Attendance Session</Text>
+          </TouchableOpacity>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Attendance Overview</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/(home)/statistics')}>
+              <Text style={styles.viewAllText}>View All {'>'}</Text>
+            </TouchableOpacity>
           </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.primaryAction}
-          onPress={() => {
-            console.log('User tapped New Attendance Session button');
-            router.push('/create-session');
-          }}
-        >
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={24}
-            color={colors.textDark}
-          />
-          <Text style={styles.primaryActionText}>New Attendance Session</Text>
-        </TouchableOpacity>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsScrollView}
+            contentContainerStyle={styles.tabsContainer}
+          >
+            {Array.from({ length: 14 }, (_, i) => `Week ${i + 1}`).map((week) => (
+              <TouchableOpacity
+                key={week}
+                style={[styles.tabItem, activeTab === week && styles.tabItemActive]}
+                onPress={() => setActiveTab(week)}
+              >
+                <Text style={[styles.tabText, activeTab === week && styles.tabTextActive]}>{week}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          {loading ? (
+             <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 40 }} />
+          ) : (
+            <View style={styles.courseList}>
+              {coursesList.map(course => (
+                <View key={course.id} style={styles.courseCard}>
+                  <View style={styles.courseHeader}>
+                    <Text style={styles.courseTitle} numberOfLines={1}>
+                      <Text style={{fontWeight: '700'}}>{course.code}</Text> - {course.name}
+                    </Text>
+                    <View style={[styles.courseBadge, { backgroundColor: course.color }]}>
+                      <Text style={styles.courseBadgeText}>{course.badgeText}</Text>
+                    </View>
+                  </View>
 
+                  <View style={styles.progressRow}>
+                    <Text style={[styles.progressText, { color: course.color }]}>
+                      {course.percentage}%
+                    </Text>
+                    <View style={styles.progressBarContainer}>
+                      <View style={[styles.progressBarFill, { width: `${course.percentage}%`, backgroundColor: course.color }]} />
+                    </View>
+                  </View>
 
+                  {renderMockBars(course.isWeekBadge || false)}
+                </View>
+              ))}
+              {coursesList.length === 0 && (
+                 <Text style={{ textAlign:'center', color:'#9CA3AF', marginVertical: 20 }}>No courses available.</Text>
+              )}
+            </View>
+          )}
 
           <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => {
-              console.log('User tapped View Statistics button');
-              router.push('/(tabs)/(home)/statistics');
-            }}
+            style={styles.viewRecordsBtn}
+            onPress={() => router.push('/export-data')}
           >
-            <View style={styles.actionIconContainer}>
-              <IconSymbol
-                ios_icon_name="chart.bar.fill"
-                android_material_icon_name="bar-chart"
-                size={28}
-                color={colors.accent}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>View Statistics</Text>
-              <Text style={styles.actionDescription}>Attendance reports and analytics</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
+            <IconSymbol ios_icon_name="doc.text.fill" android_material_icon_name="description" size={24} color="#10B981" />
+            <Text style={styles.viewRecordsText}>View Records (PDF)</Text>
+            <IconSymbol ios_icon_name="qrcode.viewfinder" android_material_icon_name="qr-code-scanner" size={24} color="#9CA3AF" />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => {
-              console.log('User tapped Export Data button');
-              router.push('/export-data');
-            }}
-          >
-            <View style={styles.actionIconContainer}>
-              <IconSymbol
-                ios_icon_name="square.and.arrow.up.fill"
-                android_material_icon_name="file-download"
-                size={28}
-                color={colors.secondary}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Export Data</Text>
-              <Text style={styles.actionDescription}>Download attendance as CSV or Excel</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
+          
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingTop: Platform.OS === 'android' ? 48 : 0,
+    backgroundColor: '#F3F4F6',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: '#F3F4F6',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: 100,
+    paddingBottom: 100, // Increased to account for the new bottom tab bar size
   },
-  header: {
+  headerBackground: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
-  headerTextContainer: {
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    paddingRight: spacing.md,
   },
-  greeting: {
-    ...typography.h2,
-    color: colors.text,
+  logoIconPlaceholder: {
+    width: 36,
+    height: 36,
+    marginRight: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
+  },
+  logoText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  logoutText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  greetingHeader: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: spacing.xs,
   },
-  subtitle: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  signOutButton: {
-    padding: spacing.sm,
+  mainContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
-  statCard: {
+  statCardBlue: {
     flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#3B82F6', 
+    borderRadius: 16,
     padding: spacing.lg,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    overflow: 'hidden',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    position: 'relative',
   },
-  statIconContainer: {
-    marginBottom: spacing.sm,
+  statTitle: {
+    color: '#DBEAFE',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: spacing.xs,
+    zIndex: 2,
   },
   statValue: {
-    ...typography.h1,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '700',
+    zIndex: 2,
   },
-  statLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
+  statWatermark: {
+    position: 'absolute',
+    bottom: -15,
+    right: -10,
+    zIndex: 1,
+    transform: [{ rotate: '-10deg' }],
   },
   primaryAction: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    backgroundColor: '#1E40AF',
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
     marginBottom: spacing.xl,
-    shadowColor: colors.primary,
+    shadowColor: '#1E40AF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
   primaryActionText: {
-    ...typography.body,
+    fontSize: 16,
     color: colors.textDark,
     fontWeight: '600',
   },
-  quickActions: {
-    marginBottom: spacing.lg,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  tabsScrollView: {
+    marginBottom: spacing.lg,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E7EB',
+    borderRadius: borderRadius.sm,
+    padding: 4,
+  },
+  tabItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  tabItemActive: {
+    backgroundColor: '#1E40AF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+  courseList: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  courseCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  courseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  courseTitle: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    marginRight: spacing.sm,
+  },
+  courseBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  courseBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
-  actionCard: {
-    backgroundColor: colors.card,
+  progressText: {
+    fontSize: 12,
+    fontWeight: '700',
+    width: 65,
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 24,
+  },
+  chartEllipsis: {
+    color: '#9CA3AF',
+    fontSize: 18,
+    lineHeight: 18,
+    marginRight: spacing.sm,
+    marginBottom: 4,
+  },
+  barsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingLeft: spacing.sm,
+  },
+  chartBar: {
+    width: 12,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+  },
+  viewRecordsBtn: {
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
+    marginBottom: spacing.xl,
   },
-  actionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  actionContent: {
+  viewRecordsText: {
     flex: 1,
-  },
-  actionTitle: {
-    ...typography.body,
-    color: colors.text,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  actionDescription: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    color: '#374151',
+    marginLeft: spacing.sm,
   },
 });

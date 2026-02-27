@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, FlatList, Modal, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, FlatList, Modal, Pressable, Alert, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/lib/supabase';
@@ -29,6 +30,8 @@ interface StudentAttendance {
 
 export default function StatisticsScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+    
     const [loading, setLoading] = useState(true);
     const [courses, setCourses] = useState<Course[]>([]);
 
@@ -86,8 +89,7 @@ export default function StatisticsScreen() {
         setSessionFound(null);
 
         try {
-            // Step 0: Fetch ALL enrolled students (assuming all users with role 'student' are enrolled)
-            // In a real app, you might have an 'enrollments' table linking students to courses.
+            // Step 0: Fetch ALL enrolled students
             const { data: allStudents, error: studentsError } = await supabase
                 .from('user')
                 .select('id, name, student_id')
@@ -151,7 +153,6 @@ export default function StatisticsScreen() {
                 // Sort by name
                 formattedList.sort((a, b) => a.name.localeCompare(b.name));
 
-
                 sessionsWithData.push({
                     id: session.id,
                     date: session.date,
@@ -170,35 +171,44 @@ export default function StatisticsScreen() {
     };
 
     const handleDeleteSession = async (sessionId: string) => {
-        Alert.alert(
-            'Delete Session',
-            'Are you sure you want to delete this session? This will remove all attendance records for this session.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setLoading(true);
-                            const { error } = await supabase
-                                .from('attendance_sessions')
-                                .delete()
-                                .eq('id', sessionId);
+        const executeDelete = async () => {
+            try {
+                setLoading(true);
+                const { error } = await supabase
+                    .from('attendance_sessions')
+                    .delete()
+                    .eq('id', sessionId);
 
-                            if (error) throw error;
+                if (error) throw error;
 
-                            // Refresh data
-                            fetchSessionAndAttendance();
-                        } catch (error) {
-                            console.error('Error deleting session:', error);
-                            Alert.alert('Error', 'Failed to delete session');
-                            setLoading(false);
-                        }
+                // Refresh data
+                fetchSessionAndAttendance();
+            } catch (error) {
+                console.error('Error deleting session:', error);
+                Alert.alert('Error', 'Failed to delete session');
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            const confirmDelete = window.confirm('Are you sure you want to delete this session? This will remove all attendance records for this session.');
+            if (confirmDelete) {
+                executeDelete();
+            }
+        } else {
+            Alert.alert(
+                'Delete Session',
+                'Are you sure you want to delete this session? This will remove all attendance records for this session.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: executeDelete,
                     },
-                },
-            ]
-        );
+                ]
+            );
+        }
     };
 
     const handleUpdateAttendance = async (newStatus: string) => {
@@ -252,63 +262,62 @@ export default function StatisticsScreen() {
 
     const renderCourseSelector = () => (
         <TouchableOpacity
-            style={styles.selectorButton}
+            style={styles.courseCard}
             onPress={() => setShowCourseModal(true)}
         >
-            <View>
-                <Text style={styles.selectorLabel}>Course</Text>
-                <Text style={styles.selectorValue}>
-                    {selectedCourse ? `${selectedCourse.code} - ${selectedCourse.name}` : 'Select a Course'}
-                </Text>
+            <View style={styles.courseHeader}>
+                <View>
+                    <Text style={styles.selectorLabel}>Course</Text>
+                    {selectedCourse ? (
+                        <Text style={styles.courseTitle}>
+                            <Text style={{fontWeight: '700'}}>{selectedCourse.code}</Text>
+                            <Text> - {selectedCourse.name}</Text>
+                        </Text>
+                    ) : (
+                        <Text style={styles.courseTitle}>Select a Course</Text>
+                    )}
+                </View>
+                <IconSymbol ios_icon_name="chevron.up.chevron.down" android_material_icon_name="unfold-more" size={24} color="#9CA3AF" />
             </View>
-            <IconSymbol
-                ios_icon_name="chevron.down"
-                android_material_icon_name="expand-more"
-                size={20}
-                color={colors.textSecondary}
-            />
         </TouchableOpacity>
     );
 
     const renderWeekSelector = () => (
         <View style={styles.weekSelectorContainer}>
-            <Text style={styles.sectionTitle}>Week</Text>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.weekScrollContent}
-            >
-                {Array.from({ length: 14 }, (_, i) => i + 1).map((week) => (
-                    <TouchableOpacity
-                        key={week}
-                        style={[
-                            styles.weekChip,
-                            selectedWeek === week && styles.weekChipSelected
-                        ]}
-                        onPress={() => setSelectedWeek(week)}
-                    >
-                        <Text style={[
-                            styles.weekText,
-                            selectedWeek === week && styles.weekTextSelected
-                        ]}>
-                            {week}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
+            <View style={styles.tabsContainer}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.weekScrollContent}
+                >
+                    {Array.from({ length: 14 }, (_, i) => i + 1).map((week) => (
+                        <TouchableOpacity
+                            key={week}
+                            style={[
+                                styles.tabItem,
+                                selectedWeek === week && styles.tabItemActive
+                            ]}
+                            onPress={() => setSelectedWeek(week)}
+                        >
+                            <Text style={[
+                                styles.tabText,
+                                selectedWeek === week && styles.tabTextActive
+                            ]}>
+                                Week {week}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
         </View>
     );
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
-            case 'present':
-                return colors.success;
-            case 'absent':
-                return colors.error; // You might need to add this to commonStyles or use a hardcoded color like '#FF3B30'
-            case 'late':
-                return '#FF9500'; // Orange
-            default:
-                return colors.textSecondary;
+            case 'present': return '#10B981'; // Green matching dashboard course progress
+            case 'absent': return '#EF4444'; // Red
+            case 'late': return '#F59E0B'; // Orange
+            default: return '#9CA3AF'; // Gray
         }
     };
 
@@ -329,16 +338,15 @@ export default function StatisticsScreen() {
         return (
             <View style={styles.studentRow}>
                 <View style={styles.studentInfo}>
-                    <Text style={styles.studentName}>{item.name}</Text>
+                    <Text style={styles.studentName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.studentId}>{item.student_number}</Text>
                 </View>
                 <View style={styles.statusContainer}>
                     <TouchableOpacity 
-                        style={[styles.statusBadge, { backgroundColor: statusColor + '20', flexDirection: 'row', alignItems: 'center' }]}
+                        style={[styles.statusBadge, { backgroundColor: statusColor }]}
                         onPress={handleStatusPress}
                     >
-                        <Text style={[styles.statusText, { color: statusColor, marginRight: 2 }]}>{item.status.toUpperCase()}</Text>
-                        <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="arrow-drop-down" size={12} color={statusColor} />
+                        <Text style={[styles.statusText, { color: '#FFFFFF' }]}>{item.status.toUpperCase()}</Text>
                     </TouchableOpacity>
                     {item.scan_time ? (
                         <Text style={styles.timeText}>
@@ -354,21 +362,21 @@ export default function StatisticsScreen() {
 
     const renderContent = () => {
         if (loading && !sessionFound) {
-            return <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />;
+            return <ActivityIndicator size="large" color="#1E40AF" style={styles.loader} />;
         }
 
         if (sessionFound === false) {
             return (
                 <View style={styles.emptyContainer}>
                     <IconSymbol
-                        ios_icon_name="calendar.badge.exclamationmark"
+                        ios_icon_name="calendar.badge.minus"
                         android_material_icon_name="event-busy"
                         size={48}
-                        color={colors.textSecondary}
+                        color="#9CA3AF"
                     />
-                    <Text style={styles.emptyText}>No session found for Week {selectedWeek}</Text>
+                    <Text style={styles.emptyText}>No sessions found</Text>
                     <Text style={styles.emptySubText}>
-                        There might be no class scheduled or no attendance session created yet.
+                        There are no class sessions created for Week {selectedWeek} yet.
                     </Text>
                 </View>
             );
@@ -377,13 +385,13 @@ export default function StatisticsScreen() {
         return (
             <View>
                 {sessionsList.map((session) => (
-                    <View key={session.id} style={styles.sessionContainer}>
+                    <View key={session.id} style={styles.sessionCard}>
                         <View style={styles.sessionHeader}>
                             <View>
-                                <Text style={styles.sessionDate}>
+                                <Text style={styles.sessionTitle}>
                                     {new Date(session.date).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
                                 </Text>
-                                <Text style={styles.sessionTime}>
+                                <Text style={styles.sessionTimeTime}>
                                     {session.time.substring(0, 5)} {/* HH:MM */}
                                 </Text>
                             </View>
@@ -395,18 +403,18 @@ export default function StatisticsScreen() {
                                     ios_icon_name="trash"
                                     android_material_icon_name="delete"
                                     size={20}
-                                    color={colors.error}
+                                    color="#EF4444"
                                 />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.listContainer}>
                             <View style={styles.listHeader}>
-                                <Text style={styles.listTitle}>Student Attendance ({session.attendance.length})</Text>
+                                <Text style={styles.listSectionTitle}>Student Attendance ({session.attendance.length})</Text>
                             </View>
 
                             {session.attendance.length === 0 ? (
-                                <Text style={styles.emptyListText}>No students have scanned in yet.</Text>
+                                <Text style={styles.emptyListText}>No students have been enrolled.</Text>
                             ) : (
                                 <FlatList
                                     data={session.attendance}
@@ -424,251 +432,307 @@ export default function StatisticsScreen() {
     };
 
     return (
-        <>
-            <Stack.Screen options={{ title: 'Attendance Report' }} />
-            <View style={styles.container}>
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    {renderCourseSelector()}
-                    {renderWeekSelector()}
-                    {renderContent()}
-                </ScrollView>
+        <View style={styles.container}>
+            {/* We hide the default stack header and build our own dark blue one */}
+            <Stack.Screen options={{ headerShown: false }} />
+            
+            {/* Dark Blue Header Section */}
+            <View style={[styles.headerBackground, { paddingTop: Math.max(insets.top, 16) }]}>
+                <View style={styles.headerTop}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={32} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Attendance Statistics</Text>
+                    <View style={{ width: 32 }} /> {/* Empty view for flex balancing with back button */}
+                </View>
+            </View>
 
-                {/* Status Selection Modal */}
-                <Modal
-                    visible={statusModalVisible}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setStatusModalVisible(false)}
-                >
-                    <Pressable style={styles.modalOverlay} onPress={() => setStatusModalVisible(false)}>
-                        <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <View>
-                                    <Text style={styles.modalTitle}>Update Status</Text>
-                                    {selectedRecord && (
-                                        <Text style={styles.modalSubtitle}>{selectedRecord.name}</Text>
-                                    )}
-                                </View>
-                                <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
-                                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="close" size={24} color={colors.textSecondary} />
-                                </TouchableOpacity>
+            <ScrollView 
+                bounces={true} 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {renderCourseSelector()}
+                {renderWeekSelector()}
+                {renderContent()}
+            </ScrollView>
+
+            {/* Status Selection Modal */}
+            <Modal
+                visible={statusModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setStatusModalVisible(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setStatusModalVisible(false)}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <View>
+                                <Text style={styles.modalTitleText}>Update Status</Text>
+                                {selectedRecord && (
+                                    <Text style={styles.modalSubtitleText}>{selectedRecord.name}</Text>
+                                )}
                             </View>
-                            
-                            {['present', 'absent'].map((statusOption) => (
+                            <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
+                                <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="close" size={24} color="#9CA3AF" />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        {['present', 'absent', 'late'].map((statusOption) => (
+                            <TouchableOpacity
+                                key={statusOption}
+                                style={[
+                                    styles.modalItem,
+                                    selectedRecord?.currentStatus === statusOption && styles.modalItemSelected
+                                ]}
+                                onPress={() => handleUpdateAttendance(statusOption)}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={[
+                                        styles.statusDot, 
+                                        { backgroundColor: getStatusColor(statusOption) }
+                                    ]} />
+                                    <Text style={[
+                                        styles.modalItemText,
+                                        selectedRecord?.currentStatus === statusOption && styles.modalItemTextSelected,
+                                        { textTransform: 'capitalize' }
+                                    ]}>
+                                        {statusOption}
+                                    </Text>
+                                </View>
+                                {selectedRecord?.currentStatus === statusOption && (
+                                    <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color="#1E40AF" />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </Pressable>
+            </Modal>
+
+            {/* Course Selection Modal */}
+            <Modal
+                visible={showCourseModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowCourseModal(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setShowCourseModal(false)}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitleText}>Select Course</Text>
+                            <TouchableOpacity onPress={() => setShowCourseModal(false)}>
+                                <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="close" size={24} color="#9CA3AF" />
+                            </TouchableOpacity>
+                        </View>
+                        <FlatList
+                            data={courses}
+                            keyExtractor={(item) => item.id}
+                            showsVerticalScrollIndicator={false}
+                            renderItem={({ item }) => (
                                 <TouchableOpacity
-                                    key={statusOption}
                                     style={[
                                         styles.modalItem,
-                                        selectedRecord?.currentStatus === statusOption && styles.modalItemSelected
+                                        selectedCourse?.id === item.id && styles.modalItemSelected
                                     ]}
-                                    onPress={() => handleUpdateAttendance(statusOption)}
+                                    onPress={() => {
+                                        setSelectedCourse(item);
+                                        setShowCourseModal(false);
+                                    }}
                                 >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <View style={[
-                                            styles.statusDot, 
-                                            { backgroundColor: getStatusColor(statusOption) }
-                                        ]} />
-                                        <Text style={[
-                                            styles.modalItemText,
-                                            selectedRecord?.currentStatus === statusOption && styles.modalItemTextSelected,
-                                            { textTransform: 'capitalize' }
-                                        ]}>
-                                            {statusOption}
-                                        </Text>
-                                    </View>
-                                    {selectedRecord?.currentStatus === statusOption && (
-                                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={colors.primary} />
+                                    <Text style={[
+                                        styles.modalItemText,
+                                        selectedCourse?.id === item.id && styles.modalItemTextSelected
+                                    ]}>
+                                        <Text style={{fontWeight: '700'}}>{item.code}</Text>
+                                        <Text> - {item.name}</Text>
+                                    </Text>
+                                    {selectedCourse?.id === item.id && (
+                                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color="#1E40AF" />
                                     )}
                                 </TouchableOpacity>
-                            ))}
-                        </View>
-                    </Pressable>
-                </Modal>
-
-                {/* Course Selection Modal */}
-                <Modal
-                    visible={showCourseModal}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setShowCourseModal(false)}
-                >
-                    <Pressable style={styles.modalOverlay} onPress={() => setShowCourseModal(false)}>
-                        <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Select Course</Text>
-                                <TouchableOpacity onPress={() => setShowCourseModal(false)}>
-                                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="close" size={24} color={colors.textSecondary} />
-                                </TouchableOpacity>
-                            </View>
-                            <FlatList
-                                data={courses}
-                                keyExtractor={(item) => item.id}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.modalItem,
-                                            selectedCourse?.id === item.id && styles.modalItemSelected
-                                        ]}
-                                        onPress={() => {
-                                            setSelectedCourse(item);
-                                            setShowCourseModal(false);
-                                        }}
-                                    >
-                                        <Text style={[
-                                            styles.modalItemText,
-                                            selectedCourse?.id === item.id && styles.modalItemTextSelected
-                                        ]}>
-                                            {item.code} - {item.name}
-                                        </Text>
-                                        {selectedCourse?.id === item.id && (
-                                            <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={colors.primary} />
-                                        )}
-                                    </TouchableOpacity>
-                                )}
-                            />
-                        </View>
-                    </Pressable>
-                </Modal>
-            </View>
-        </>
+                            )}
+                        />
+                    </View>
+                </Pressable>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F3F4F6',
+    },
+    headerBackground: {
+        backgroundColor: '#0F172A',
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: spacing.md,
+    },
+    backButton: {
+        paddingVertical: 5,
+        paddingRight: 10,
+    },
+    headerTitle: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '700',
     },
     scrollContent: {
         padding: spacing.lg,
-        paddingBottom: 40,
+        paddingBottom: 100, // Safe padding above bottom tab bar
     },
     loader: {
         marginTop: spacing.xl,
     },
 
-    // Selectors
-    selectorButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: colors.card,
-        padding: spacing.md,
+    // Course Selector (Card Style like Index)
+    courseCard: {
+        backgroundColor: '#FFFFFF',
         borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        paddingHorizontal: spacing.lg,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
         marginBottom: spacing.lg,
-        borderWidth: 1,
-        borderColor: colors.border,
+    },
+    courseHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     selectorLabel: {
-        ...typography.caption,
-        color: colors.textSecondary,
-        marginBottom: 4,
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: '500',
+        marginBottom: 2,
     },
-    selectorValue: {
-        ...typography.body,
-        fontWeight: '600',
-        color: colors.text,
+    courseTitle: {
+        fontSize: 15,
+        color: '#374151',
     },
 
-    // Week Selector
+    // Week Selector (Segmented UI like Index)
     weekSelectorContainer: {
         marginBottom: spacing.xl,
     },
-    sectionTitle: {
-        ...typography.h3,
-        color: colors.text,
-        marginBottom: spacing.xs,
+    tabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#E5E7EB',
+        borderRadius: borderRadius.sm,
+        padding: 4,
     },
     weekScrollContent: {
-        // paddingVertical: spacing.xs,
-        gap: spacing.sm,
-    },
-    weekChip: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: colors.card,
         alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
     },
-    weekChipSelected: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
+    tabItem: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        borderRadius: 6,
     },
-    weekText: {
-        ...typography.body,
-        color: colors.text,
-        fontWeight: '500',
+    tabItemActive: {
+        backgroundColor: '#1E40AF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    weekTextSelected: {
-        color: colors.textDark, // Assuming primary is dark enough, or use white
-        fontWeight: '700',
+    tabText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    tabTextActive: {
+        color: '#FFFFFF',
     },
 
-    // List
-    sessionContainer: {
-        marginBottom: spacing.xl,
+    // Sessions (Card Style)
+    sessionCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.lg,
+        paddingBottom: spacing.sm,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+        marginBottom: spacing.lg,
     },
     sessionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.sm,
-        paddingHorizontal: spacing.xs,
+        marginBottom: spacing.md,
     },
-    sessionDate: {
-        ...typography.h3,
-        color: colors.text,
+    sessionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
     },
-    sessionTime: {
-        ...typography.body,
-        color: colors.textSecondary,
+    sessionTimeTime: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginTop: 2,
     },
     deleteButton: {
         padding: spacing.xs,
+        backgroundColor: '#FEE2E2',
+        borderRadius: 8,
     },
+
+    // Internal Student List
     listContainer: {
-        backgroundColor: colors.card,
-        borderRadius: borderRadius.lg,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: colors.border,
+        marginTop: spacing.xs,
     },
     listHeader: {
-        padding: spacing.md,
-        backgroundColor: colors.background, // Slightly different ?
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#F3F4F6',
+        paddingBottom: spacing.sm,
+        marginBottom: spacing.sm,
     },
-    listTitle: {
-        ...typography.h3,
-        fontSize: 16,
+    listSectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6B7280',
     },
     emptyListText: {
-        padding: spacing.lg,
+        paddingVertical: spacing.md,
         textAlign: 'center',
-        color: colors.textSecondary,
+        color: '#9CA3AF',
+        fontSize: 13,
     },
     studentRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: spacing.md,
+        paddingVertical: spacing.md,
     },
     studentInfo: {
         flex: 1,
         marginRight: spacing.md,
     },
     studentName: {
-        ...typography.body,
+        fontSize: 14,
         fontWeight: '600',
-        color: colors.text,
+        color: '#374151',
     },
     studentId: {
-        ...typography.caption,
-        color: colors.textSecondary,
+        fontSize: 12,
+        color: '#9CA3AF',
+        marginTop: 2,
     },
     statusContainer: {
         alignItems: 'flex-end',
@@ -676,23 +740,25 @@ const styles = StyleSheet.create({
     },
     statusBadge: {
         paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
-        marginBottom: 2,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginBottom: 4,
         alignItems: 'center',
+        minWidth: 72,
     },
     statusText: {
         fontSize: 10,
-        fontWeight: '700',
+        fontWeight: '800',
+        letterSpacing: 0.5,
     },
     timeText: {
-        ...typography.caption,
         fontSize: 10,
-        color: colors.textSecondary,
+        color: '#9CA3AF',
+        fontWeight: '600',
     },
     separator: {
         height: 1,
-        backgroundColor: colors.border,
+        backgroundColor: '#F3F4F6',
     },
 
     // Empty State
@@ -703,29 +769,32 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
     },
     emptyText: {
-        ...typography.h3,
-        color: colors.text,
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#374151',
         marginTop: spacing.md,
         textAlign: 'center',
     },
     emptySubText: {
-        ...typography.body,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#9CA3AF',
         textAlign: 'center',
-        marginTop: spacing.xs,
+        marginTop: spacing.sm,
+        lineHeight: 20,
     },
 
-    // Modal
+    // Modal Overrides
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(15, 23, 42, 0.4)', // Dark blue tint for overlay
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: colors.card,
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         maxHeight: '70%',
+        paddingBottom: 20,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -733,14 +802,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: spacing.lg,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#F3F4F6',
     },
-    modalTitle: {
-        ...typography.h3,
+    modalTitleText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
     },
-    modalSubtitle: {
-        ...typography.caption,
-        color: colors.textSecondary,
+    modalSubtitleText: {
+        fontSize: 13,
+        color: '#6B7280',
         marginTop: 2,
     },
     statusDot: {
@@ -755,17 +826,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: spacing.lg,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#F3F4F6',
     },
     modalItemSelected: {
-        backgroundColor: colors.highlight,
+        backgroundColor: '#EFF6FF', // Light blue highlight
     },
     modalItemText: {
-        ...typography.body,
-        color: colors.text,
+        fontSize: 15,
+        color: '#374151',
     },
     modalItemTextSelected: {
         fontWeight: '700',
-        color: colors.primary,
+        color: '#1E40AF',
     },
 });

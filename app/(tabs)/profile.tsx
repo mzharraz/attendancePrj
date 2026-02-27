@@ -1,15 +1,15 @@
-
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
-import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
+import { spacing, borderRadius, typography } from '@/styles/commonStyles';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleSignOut = async () => {
     console.log('User tapped Sign Out button');
@@ -25,21 +25,32 @@ export default function ProfileScreen() {
   const userEmail = user?.email || '';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <IconSymbol
-              ios_icon_name="person.circle.fill"
-              android_material_icon_name="account-circle"
-              size={80}
-              color={colors.primary}
-            />
-          </View>
-          <Text style={styles.userName}>{userName}</Text>
-          <Text style={styles.userEmail}>{userEmail}</Text>
+    <View style={styles.container}>
+      {/* Dark Blue Header Section */}
+      <View style={[styles.headerBackground, { paddingTop: Math.max(insets.top, 16) }]}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Profile</Text>
         </View>
+        <View style={styles.profileHeaderContent}>
+          <IconSymbol
+            ios_icon_name="person.circle.fill"
+            android_material_icon_name="account-circle"
+            size={56}
+            color="#FFFFFF"
+          />
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userEmail}>{userEmail}</Text>
+          </View>
+        </View>
+      </View>
 
+      <ScrollView 
+        bounces={true} 
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
 
@@ -51,8 +62,8 @@ export default function ProfileScreen() {
               <IconSymbol
                 ios_icon_name="person.fill"
                 android_material_icon_name="person"
-                size={24}
-                color={colors.primary}
+                size={22}
+                color="#1E40AF"
               />
             </View>
             <View style={styles.menuContent}>
@@ -63,11 +74,9 @@ export default function ProfileScreen() {
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron-right"
               size={20}
-              color={colors.textSecondary}
+              color="#9CA3AF"
             />
           </TouchableOpacity>
-
-
         </View>
 
         <View style={styles.section}>
@@ -80,12 +89,12 @@ export default function ProfileScreen() {
               router.push('/help-support');
             }}
           >
-            <View style={styles.menuIconContainer}>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#E0F2FE' }]}>
               <IconSymbol
                 ios_icon_name="info.circle.fill"
                 android_material_icon_name="info"
-                size={24}
-                color={colors.info}
+                size={22}
+                color="#0369A1"
               />
             </View>
             <View style={styles.menuContent}>
@@ -96,7 +105,7 @@ export default function ProfileScreen() {
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron-right"
               size={20}
-              color={colors.textSecondary}
+              color="#9CA3AF"
             />
           </TouchableOpacity>
 
@@ -104,12 +113,12 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => router.push('/privacy-policy')}
           >
-            <View style={styles.menuIconContainer}>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#F3E8FF' }]}>
               <IconSymbol
                 ios_icon_name="doc.text.fill"
                 android_material_icon_name="description"
-                size={24}
-                color={colors.secondary}
+                size={22}
+                color="#7E22CE"
               />
             </View>
             <View style={styles.menuContent}>
@@ -120,7 +129,7 @@ export default function ProfileScreen() {
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron-right"
               size={20}
-              color={colors.textSecondary}
+              color="#9CA3AF"
             />
           </TouchableOpacity>
         </View>
@@ -129,73 +138,94 @@ export default function ProfileScreen() {
           <IconSymbol
             ios_icon_name="rectangle.portrait.and.arrow.right"
             android_material_icon_name="logout"
-            size={24}
-            color={colors.error}
+            size={22}
+            color="#EF4444"
           />
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
 
         <Text style={styles.version}>Version 1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingTop: Platform.OS === 'android' ? 48 : 0,
+    backgroundColor: '#F3F4F6',
+  },
+  headerBackground: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  profileHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userInfoContainer: {
+    marginLeft: spacing.md,
+    flex: 1, // Add flex: 1 to allow container to shrink and text to wrap
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+    flexWrap: 'wrap', // Let text wrap onto next line
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#94A3B8',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: spacing.lg,
-    paddingBottom: 100,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  avatarContainer: {
-    marginBottom: spacing.md,
-  },
-  userName: {
-    ...typography.h2,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  userEmail: {
-    ...typography.body,
-    color: colors.textSecondary,
+    paddingBottom: 100, // accommodate bottom tab bar
   },
   section: {
     marginBottom: spacing.xl,
   },
   sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: spacing.md,
   },
   menuItem: {
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
   },
   menuIconContainer: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.highlight,
+    backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -204,35 +234,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuTitle: {
-    ...typography.body,
-    color: colors.text,
+    fontSize: 16,
+    color: '#374151',
     fontWeight: '600',
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   menuDescription: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 13,
+    color: '#6B7280',
   },
   signOutButton: {
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.error,
+    marginBottom: spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
   },
   signOutText: {
-    ...typography.body,
-    color: colors.error,
+    fontSize: 16,
+    color: '#EF4444',
     fontWeight: '600',
   },
   version: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 13,
+    color: '#9CA3AF',
     textAlign: 'center',
+    marginBottom: spacing.xl,
   },
 });

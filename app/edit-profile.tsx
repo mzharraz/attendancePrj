@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Modal, ActivityIndicator, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Modal, ActivityIndicator, LayoutAnimation, UIManager, Pressable } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
+import { spacing, borderRadius, typography } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { LoadingButton } from '@/components/LoadingButton';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +21,8 @@ interface Course {
 export default function EditProfileScreen() {
     const { user, updateProfile } = useAuth();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+    
     const [name, setName] = useState(user?.name || '');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -169,39 +171,44 @@ export default function EditProfileScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <IconSymbol
-                        ios_icon_name="chevron.left"
-                        android_material_icon_name="chevron-left"
-                        size={28}
-                        color={colors.text}
-                    />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Edit Profile</Text>
-                <View style={{ width: 40 }} />
+            
+            {/* Dark Blue Header Section */}
+            <View style={[styles.headerBackground, { paddingTop: Math.max(insets.top, 16) }]}>
+                <View style={styles.headerTop}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={32} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Edit Profile</Text>
+                    <View style={{ width: 32 }} />
+                </View>
             </View>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView 
+                    bounces={true} 
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.content}
+                >
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Personal Information</Text>
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Full Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Enter your name"
-                                placeholderTextColor={colors.textSecondary}
-                                autoCapitalize="words"
-                            />
-                            <Text style={styles.helperText}>This name will be visible to your students.</Text>
+                        <View style={styles.card}>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Full Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Enter your name"
+                                    placeholderTextColor="#9CA3AF"
+                                    autoCapitalize="words"
+                                />
+                                <Text style={styles.helperText}>This name will be visible to your students.</Text>
+                            </View>
                         </View>
                     </View>
 
@@ -213,15 +220,15 @@ export default function EditProfileScreen() {
                                     <IconSymbol
                                         ios_icon_name="plus"
                                         android_material_icon_name="add"
-                                        size={20}
-                                        color={colors.primary}
+                                        size={16}
+                                        color="#1E40AF"
                                     />
                                     <Text style={styles.addButtonText}>Add Course</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {loadingCourses ? (
-                                <ActivityIndicator size="small" color={colors.primary} />
+                                <ActivityIndicator size="small" color="#1E40AF" style={{ marginTop: spacing.md }} />
                             ) : (
                                 <View style={styles.courseList}>
                                     {courses.length === 0 ? (
@@ -242,7 +249,7 @@ export default function EditProfileScreen() {
                                                             ios_icon_name="pencil"
                                                             android_material_icon_name="edit"
                                                             size={20}
-                                                            color={colors.textSecondary}
+                                                            color="#6B7280"
                                                         />
                                                     </TouchableOpacity>
                                                     <TouchableOpacity
@@ -253,7 +260,7 @@ export default function EditProfileScreen() {
                                                             ios_icon_name="trash"
                                                             android_material_icon_name="delete"
                                                             size={20}
-                                                            color={colors.error}
+                                                            color="#EF4444"
                                                         />
                                                     </TouchableOpacity>
                                                 </View>
@@ -278,7 +285,7 @@ export default function EditProfileScreen() {
             </KeyboardAvoidingView>
 
             <Modal
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
@@ -294,15 +301,15 @@ export default function EditProfileScreen() {
                             </Text>
                             <TouchableOpacity onPress={() => setModalVisible(false)}>
                                 <IconSymbol
-                                    ios_icon_name="xmark"
+                                    ios_icon_name="xmark.circle.fill"
                                     android_material_icon_name="close"
                                     size={24}
-                                    color={colors.textSecondary}
+                                    color="#9CA3AF"
                                 />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView>
+                        <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={styles.modalBody}>
                                 <View style={styles.inputContainer}>
                                     <Text style={styles.label}>Course Code</Text>
@@ -311,7 +318,7 @@ export default function EditProfileScreen() {
                                         value={courseCode}
                                         onChangeText={setCourseCode}
                                         placeholder="e.g. CS101"
-                                        placeholderTextColor={colors.textSecondary}
+                                        placeholderTextColor="#9CA3AF"
                                         autoCapitalize="characters"
                                     />
                                 </View>
@@ -323,7 +330,7 @@ export default function EditProfileScreen() {
                                         value={courseName}
                                         onChangeText={setCourseName}
                                         placeholder="e.g. Introduction to Computer Science"
-                                        placeholderTextColor={colors.textSecondary}
+                                        placeholderTextColor="#9CA3AF"
                                     />
                                 </View>
 
@@ -339,31 +346,34 @@ export default function EditProfileScreen() {
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F3F4F6',
     },
-    header: {
+    headerBackground: {
+        backgroundColor: '#0F172A',
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+    },
+    headerTop: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: colors.card,
+        marginTop: spacing.md,
     },
     backButton: {
-        padding: spacing.xs,
+        paddingVertical: 5,
+        paddingRight: 10,
     },
     headerTitle: {
-        ...typography.h3,
-        color: colors.text,
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '700',
     },
     content: {
         padding: spacing.lg,
@@ -379,32 +389,42 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     sectionTitle: {
-        ...typography.h3,
         fontSize: 18,
-        color: colors.text,
-        marginBottom: spacing.sm,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        paddingHorizontal: spacing.lg,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     inputContainer: {
-        marginBottom: spacing.md,
-    },
-    label: {
-        ...typography.body,
-        fontWeight: '600',
-        color: colors.text,
         marginBottom: spacing.sm,
     },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: spacing.xs,
+    },
     input: {
-        backgroundColor: colors.card,
+        backgroundColor: '#F9FAFB',
         borderRadius: borderRadius.md,
         padding: spacing.md,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#E5E7EB',
         fontSize: 16,
-        color: colors.text,
+        color: '#1F2937',
     },
     helperText: {
-        ...typography.caption,
-        color: colors.textSecondary,
+        fontSize: 12,
+        color: '#6B7280',
         marginTop: spacing.xs,
     },
     buttonContainer: {
@@ -412,36 +432,46 @@ const styles = StyleSheet.create({
         marginBottom: spacing.xl,
     },
     saveButton: {
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#1E40AF',
+        borderRadius: borderRadius.md,
+        paddingVertical: 14,
         height: 56,
+        shadowColor: '#1E40AF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     saveButtonText: {
-        ...typography.body,
-        fontWeight: '600',
+        fontSize: 16,
         color: '#FFFFFF',
+        fontWeight: '600',
     },
     // Course List Styles
     addButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        padding: 4,
+        backgroundColor: '#DBEAFE',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
     addButtonText: {
-        ...typography.body,
-        color: colors.primary,
+        fontSize: 13,
         fontWeight: '600',
+        color: '#1E40AF',
+        marginLeft: 4,
     },
     courseList: {
-        gap: spacing.sm,
+        gap: spacing.md,
     },
     courseItem: {
-        backgroundColor: colors.card,
-        borderRadius: borderRadius.md,
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.lg,
         padding: spacing.md,
+        paddingHorizontal: spacing.lg,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: '#E5E7EB',
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -450,14 +480,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     courseCode: {
-        ...typography.body,
+        fontSize: 15,
         fontWeight: '700',
-        color: colors.primary,
+        color: '#1F2937',
         marginBottom: 2,
     },
     courseName: {
-        ...typography.bodySmall,
-        color: colors.text,
+        fontSize: 13,
+        color: '#6B7280',
     },
     courseActions: {
         flexDirection: 'row',
@@ -466,13 +496,15 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         padding: 8,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
     },
     deleteButton: {
-        // marginLeft: spacing.xs,
+        backgroundColor: '#FEE2E2',
     },
     emptyText: {
-        ...typography.body,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#9CA3AF',
         textAlign: 'center',
         fontStyle: 'italic',
         marginTop: spacing.sm,
@@ -480,15 +512,17 @@ const styles = StyleSheet.create({
     // Modal Styles
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(15, 23, 42, 0.4)',
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: colors.background,
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
-        padding: spacing.lg,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: spacing.xl,
+        paddingBottom: spacing.xl * 2,
         minHeight: '50%',
+        maxHeight: '90%',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -497,16 +531,22 @@ const styles = StyleSheet.create({
         marginBottom: spacing.xl,
     },
     modalTitle: {
-        ...typography.h3,
-        color: colors.text,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
     },
     modalBody: {
         gap: spacing.md,
     },
     modalButton: {
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#1E40AF',
+        borderRadius: borderRadius.md,
         height: 50,
         marginTop: spacing.lg,
+        shadowColor: '#1E40AF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
 });

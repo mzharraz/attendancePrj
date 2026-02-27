@@ -18,7 +18,7 @@ export default function Index() {
           console.log('[ROOT] User authenticated but role is missing. Waiting.');
           return;
         }
-
+  
         // User is authenticated, redirect based on role
         if (user.role === 'student') {
           console.log('[ROOT] Redirecting to /student-qr');
