@@ -15,7 +15,7 @@ export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [lastScanned, setLastScanned] = useState<{ name: string; status: 'success' | 'error'; message: string } | null>(null);
+  const [lastScanned, setLastScanned] = useState<{ name: string; status: 'success' | 'error' | 'enrolled'; message: string } | null>(null);
   const isProcessing = React.useRef(false); // Ref for immediate lock
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -138,6 +138,31 @@ export default function ScanScreen() {
         activeSessionId = sessionData.id;
       }
 
+      // Check for course_id for enrollment check
+      const { data: sessionInfo, error: sessInfoError } = await supabase
+        .from('attendance_sessions')
+        .select('course_id')
+        .eq('id', activeSessionId)
+        .single();
+        
+      let isFirstTime = false;
+
+      if (!sessInfoError && sessionInfo) {
+        // Check if student is enrolled
+        const { data: enrollmentData, error: enrollCheckError } = await supabase
+          .from('course_enrollments')
+          .select('id')
+          .eq('course_id', sessionInfo.course_id)
+          .eq('student_id', qrData.studentId)
+          .maybeSingle();
+
+        if (!enrollCheckError && !enrollmentData) {
+          // They are not enrolled. The Postgres trigger WILL enroll them when we insert
+          // the attendance record, but we want to know it's their first time here to show UI
+          isFirstTime = true;
+        }
+      }
+
       // Insert record
       const { error: insertError } = await supabase
         .from('attendance_records')
@@ -162,8 +187,8 @@ export default function ScanScreen() {
       } else {
         setLastScanned({
           name: qrData.name,
-          status: 'success',
-          message: 'Attendance marked successfully.'
+          status: isFirstTime ? 'enrolled' : 'success',
+          message: isFirstTime ? 'First-time registration successful & attendance marked!' : 'Attendance marked successfully.'
         });
         
         playSuccessSound();
@@ -297,18 +322,46 @@ export default function ScanScreen() {
         ) : (
           <View style={styles.resultContainer}>
             <IconSymbol
-              ios_icon_name={lastScanned.status === 'success' ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-              android_material_icon_name={lastScanned.status === 'success' ? 'check-circle' : 'error'}
+              ios_icon_name={
+                lastScanned.status === 'success' 
+                  ? 'checkmark.circle.fill' 
+                  : lastScanned.status === 'enrolled' 
+                    ? 'person.crop.circle.badge.plus'
+                    : 'xmark.circle.fill'
+              }
+              android_material_icon_name={
+                lastScanned.status === 'success' 
+                  ? 'check-circle' 
+                  : lastScanned.status === 'enrolled' 
+                    ? 'person-add'
+                    : 'error'
+              }
               size={80}
-              color={lastScanned.status === 'success' ? colors.primary : colors.error}
+              color={
+                lastScanned.status === 'success' 
+                  ? colors.primary 
+                  : lastScanned.status === 'enrolled' 
+                    ? colors.highlight 
+                    : colors.error
+              }
             />
             <Text style={styles.resultTitle}>
-              {lastScanned.status === 'success' ? 'Success!' : 'Error'}
+              {lastScanned.status === 'success' 
+                ? 'Success!' 
+                : lastScanned.status === 'enrolled' 
+                  ? 'Enrolled!' 
+                  : 'Error'}
             </Text>
             <Text style={styles.resultName}>{lastScanned.name}</Text>
             <Text style={styles.resultMessage}>{lastScanned.message}</Text>
 
-            <TouchableOpacity style={styles.scanNextButton} onPress={handleScanNext}>
+            <TouchableOpacity 
+               style={[
+                 styles.scanNextButton, 
+                 lastScanned.status === 'enrolled' && styles.enrolledButton
+               ]} 
+               onPress={handleScanNext}
+            >
               <Text style={styles.scanNextButtonText}>Scan Next Student</Text>
             </TouchableOpacity>
           </View>
@@ -540,4 +593,7 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: '600',
   },
+  enrolledButton: {
+    backgroundColor: colors.highlight,
+  }
 });

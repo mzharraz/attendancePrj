@@ -89,14 +89,24 @@ export default function StatisticsScreen() {
         setSessionFound(null);
 
         try {
-            // Step 0: Fetch ALL enrolled students
-            const { data: allStudents, error: studentsError } = await supabase
-                .from('user')
-                .select('id, name, student_id')
-                .eq('role', 'student')
-                .order('name');
+            // Step 0: Fetch ONLY enrolled students for this course
+            const { data: enrolledStudentsData, error: studentsError } = await supabase
+                .from('course_enrollments')
+                .select(`
+                    user:student_id (
+                        id,
+                        name,
+                        student_id
+                    )
+                `)
+                .eq('course_id', selectedCourse.id);
 
             if (studentsError) throw studentsError;
+
+            // Map the joined data back to a flat array format
+            const allStudents = enrolledStudentsData
+                ?.map(enrollment => enrollment.user)
+                ?.filter(user => user !== null) as any[] || [];
 
             // Step A: Find ALL sessions for the selected Course + Week
             const { data: sessions, error: sessionError } = await supabase

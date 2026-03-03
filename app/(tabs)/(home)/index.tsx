@@ -229,13 +229,21 @@ export default function DashboardScreen() {
                 <IconSymbol ios_icon_name="barcode" android_material_icon_name="qr-code-scanner" size={72} color="rgba(255,255,255,0.15)" />
               </View>
             </View>
-            <View style={[styles.statCardBlue, { marginLeft: spacing.sm }]}>
-              <Text style={styles.statTitle}>Total Students</Text>
+            <TouchableOpacity 
+              style={[styles.statCardBlue, { marginLeft: spacing.sm }]}
+              onPress={() => router.push('/roster')}
+              activeOpacity={0.7}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
+                <Text style={[styles.statTitle, { marginBottom: 0 }]}>Total Students</Text>
+                <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color="#DBEAFE" />
+              </View>
               <Text style={styles.statValue}>{dashboardData.todayScans}</Text>
+              <Text style={{ color: '#DBEAFE', fontSize: 11, marginTop: 4, zIndex: 2, fontWeight: '500' }}>Tap to view roster</Text>
               <View style={styles.statWatermark}>
                 <IconSymbol ios_icon_name="chart.bar.doc.horizontal" android_material_icon_name="grid-on" size={72} color="rgba(255,255,255,0.15)" />
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity

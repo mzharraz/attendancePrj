@@ -30,6 +30,23 @@ export const courses = pgTable(
 );
 
 /**
+ * Course Enrollments table
+ * Tracks which students are registered for which courses
+ */
+export const courseEnrollments = pgTable(
+  'course_enrollments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    courseId: uuid('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
+    studentId: text('student_id').notNull().references(() => authUser.id, { onDelete: 'cascade' }),
+    enrolledAt: timestamp('enrolled_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('course_enrollments_unique_idx').on(table.courseId, table.studentId),
+  ]
+);
+
+/**
  * Attendance sessions table
  * Stores attendance sessions for each course
  * Status: 'active' (ongoing) or 'completed' (finished)
@@ -80,6 +97,18 @@ export const coursesRelations = relations(courses, ({ one, many }) => ({
     references: [authUser.id],
   }),
   sessions: many(attendanceSessions),
+  enrollments: many(courseEnrollments),
+}));
+
+export const courseEnrollmentsRelations = relations(courseEnrollments, ({ one }) => ({
+  course: one(courses, {
+    fields: [courseEnrollments.courseId],
+    references: [courses.id],
+  }),
+  student: one(authUser, {
+    fields: [courseEnrollments.studentId],
+    references: [authUser.id],
+  }),
 }));
 
 export const attendanceSessionsRelations = relations(attendanceSessions, ({ one, many }) => ({
