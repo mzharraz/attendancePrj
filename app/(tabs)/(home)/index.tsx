@@ -141,6 +141,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (!authLoading && !user) {
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/auth');
       return;
     }
@@ -153,6 +154,7 @@ export default function DashboardScreen() {
   const handleSignOut = async () => {
     try {
       await signOut();
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/auth');
     } catch (error) {
       console.error('Sign out error:', error);

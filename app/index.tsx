@@ -22,17 +22,21 @@ export default function Index() {
         // User is authenticated, redirect based on role
         if (user.role === 'student') {
           console.log('[ROOT] Redirecting to /student-qr');
+          if (router.canDismiss()) router.dismissAll();
           router.replace('/student-qr' as any);
         } else if (user.role === 'lecturer') {
           console.log('[ROOT] Redirecting to /(tabs)/(home)');
+          if (router.canDismiss()) router.dismissAll();
           router.replace('/(tabs)/(home)' as any);
         } else {
           console.log('[ROOT] Unknown role:', user.role);
+          if (router.canDismiss()) router.dismissAll();
           router.replace('/(tabs)/(home)' as any);
         }
       } else {
         console.log('[ROOT] User not authenticated, redirecting to /auth');
         // User is not authenticated, redirect to auth
+        if (router.canDismiss()) router.dismissAll();
         router.replace('/auth');
       }
     }

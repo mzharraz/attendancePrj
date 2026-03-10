@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,7 @@ export default function StudentQRScreen() {
     console.log('StudentQRScreen mounted, user:', user);
     if (!authLoading && !user) {
       console.log('No user found, redirecting to auth');
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/auth');
       return;
     }
@@ -60,10 +61,17 @@ export default function StudentQRScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <BackButton label="Log Out" onPress={() => {
-              signOut();
+            <BackButton label="Log Out" onPress={async () => {
+              await signOut();
+              if (router.canDismiss()) router.dismissAll();
               router.replace('/auth');
             }} />
+            <TouchableOpacity 
+              style={styles.editProfileButton}
+              onPress={() => router.push('/edit-profile')}
+            >
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.title}>Your QR Code</Text>
           <Text style={styles.subtitle}>Show this to your lecturer for attendance</Text>
@@ -133,8 +141,21 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     width: '100%',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.md,
+  },
+  editProfileButton: {
+    backgroundColor: 'rgba(30, 64, 175, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  editProfileText: {
+    ...typography.caption,
+    color: '#1E40AF',
+    fontWeight: '600',
   },
   title: {
     ...typography.h2,

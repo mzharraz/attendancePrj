@@ -23,7 +23,7 @@ interface AuthContextType {
   signInWithGitHub: () => Promise<void>;
   signOut: () => Promise<void>;
   fetchUser: () => Promise<void>;
-  updateProfile: (name: string) => Promise<void>;
+  updateProfile: (data: { name?: string; email?: string; password?: string; old_password?: string; student_id?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -243,21 +243,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateProfile = async (name: string) => {
+  const updateProfile = async (data: { name?: string; email?: string; password?: string; old_password?: string; student_id?: string }) => {
     try {
+      console.log('UpdateProfile: Started with data:', data);
       if (!user?.id) throw new Error("No user logged in");
 
-      const { error } = await supabase
-        .from('user')
-        .update({ name })
-        .eq('id', user.id);
+      // Verify old password if trying to update the password
+      if (data.password) {
+        console.log('UpdateProfile: Verifying old password...');
+        if (!data.old_password) {
+          throw new Error("Current password is required to set a new password.");
+        }
+        console.log('UpdateProfile: Calling signInWithPassword for old password verification...');
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: data.old_password,
+        });
 
-      if (error) throw error;
+        if (verifyError) {
+          console.error('UpdateProfile: signInWithPassword failed:', verifyError);
+          throw new Error("Incorrect current password.");
+        }
+        console.log('UpdateProfile: Old password verified successfully');
+      }
 
-      // Update local state
-      setUser(prev => prev ? { ...prev, name } : null);
+      // 1. Update authentication credentials (email/password) in Supabase Auth if provided and changed
+      const authUpdates: any = {};
+      if (data.email && data.email !== user.email) authUpdates.email = data.email;
+      if (data.password) authUpdates.password = data.password;
+
+      if (Object.keys(authUpdates).length > 0) {
+        console.log('UpdateProfile: Calling supabase.auth.updateUser with:', authUpdates);
+        const { error: authError } = await supabase.auth.updateUser(authUpdates);
+        if (authError) {
+          console.error('UpdateProfile: supabase.auth.updateUser failed:', authError);
+          throw authError;
+        }
+        console.log('UpdateProfile: supabase.auth.updateUser succeeded');
+      }
+
+      // 2. Update user profile data in the public.user table
+      const dbUpdates: any = {};
+      if (data.name !== undefined) dbUpdates.name = data.name;
+      if (data.email !== undefined) dbUpdates.email = data.email;
+      if (data.student_id !== undefined) dbUpdates.student_id = data.student_id;
+
+      if (Object.keys(dbUpdates).length > 0) {
+        console.log('UpdateProfile: Calling supabase.from(user).update with:', dbUpdates);
+        const { error: dbError } = await supabase
+          .from('user')
+          .update(dbUpdates)
+          .eq('id', user.id);
+
+        if (dbError) {
+          console.error('UpdateProfile: supabase.from(user).update failed:', dbError);
+          throw dbError;
+        }
+        console.log('UpdateProfile: supabase.from(user).update succeeded');
+      }
+
+      // 3. Update local state
+      console.log('UpdateProfile: Updating local state');
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          name: data.name !== undefined ? data.name : prev.name,
+          email: data.email !== undefined ? data.email : prev.email,
+          student_id: data.student_id !== undefined ? data.student_id : prev.student_id,
+        };
+      });
+      console.log('UpdateProfile: Finished successfully');
     } catch (error) {
-      console.error("Update profile failed:", error);
+      console.error("UpdateProfile: Update profile failed:", error);
       throw error;
     }
   };

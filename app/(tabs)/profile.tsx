@@ -15,6 +15,7 @@ export default function ProfileScreen() {
     console.log('User tapped Sign Out button');
     try {
       await signOut();
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/auth');
     } catch (error) {
       console.error('Sign out error:', error);

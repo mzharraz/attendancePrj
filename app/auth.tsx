@@ -53,12 +53,15 @@ export default function AuthScreen() {
 
       if (user.role === 'student') {
         console.log('Redirecting student to /student-qr');
+        if (router.canDismiss()) router.dismissAll();
         router.replace('/student-qr' as any);
       } else if (user.role === 'lecturer') {
         console.log('Redirecting lecturer to /(tabs)/(home)');
+        if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)/(home)' as any);
       } else {
         console.log('Unknown role:', user.role);
+        if (router.canDismiss()) router.dismissAll();
         // Fallback or error state?
         // Defaulting to home might be safe for now if role is garbage data
         router.replace('/(tabs)/(home)' as any);

@@ -24,7 +24,12 @@ export default function EditProfileScreen() {
     const insets = useSafeAreaInsets();
     
     const [name, setName] = useState(user?.name || '');
+    const [email, setEmail] = useState(user?.email || '');
+    const [studentId, setStudentId] = useState(user?.student_id || '');
     const [isLoading, setIsLoading] = useState(false);
+    
+    // Field-specific errors
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     // Course management state
     const [courses, setCourses] = useState<Course[]>([]);
@@ -62,19 +67,50 @@ export default function EditProfileScreen() {
     };
 
     const handleSave = async () => {
+        setErrors({}); // Reset errors
+        let hasError = false;
+        const newErrors: { [key: string]: string } = {};
+
         if (!name.trim()) {
-            Alert.alert('Error', 'Name cannot be empty');
+            newErrors.name = 'Name cannot be empty';
+            hasError = true;
+        }
+        if (!email.trim()) {
+            newErrors.email = 'Email cannot be empty';
+            hasError = true;
+        }
+        if (user?.role === 'student' && !studentId.trim()) {
+            newErrors.studentId = 'Student ID cannot be empty';
+            hasError = true;
+        }
+
+        if (hasError) {
+            setErrors(newErrors);
             return;
         }
 
         try {
             setIsLoading(true);
-            await updateProfile(name);
+            await updateProfile({
+                name: name.trim(),
+                email: email.trim(),
+                student_id: user?.role === 'student' ? studentId.trim() : undefined,
+            });
+            
             Alert.alert('Success', 'Profile updated successfully', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
-        } catch (error) {
-            Alert.alert('Error', 'Failed to update profile');
+        } catch (error: any) {
+            console.error('Update profile error:', error);
+            const msg = error.message || '';
+            const nextErrors: { [key: string]: string } = {};
+            
+            if (msg.toLowerCase().includes('email')) {
+                nextErrors.email = msg;
+            } else {
+                nextErrors.general = msg || 'Failed to update profile';
+            }
+            setErrors(nextErrors);
         } finally {
             setIsLoading(false);
         }
@@ -196,20 +232,93 @@ export default function EditProfileScreen() {
                 >
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Personal Information</Text>
+                        
+                        {errors.general && (
+                            <View style={[styles.errorContainer, { marginBottom: spacing.md }]}>
+                                <Text style={styles.errorText}>{errors.general}</Text>
+                            </View>
+                        )}
+                        
                         <View style={styles.card}>
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>Full Name</Text>
+                                {errors.name && <Text style={styles.inlineErrorText}>{errors.name}</Text>}
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, errors.name ? styles.inputError : null]}
                                     value={name}
-                                    onChangeText={setName}
+                                    onChangeText={(text) => {
+                                        setName(text);
+                                        if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
+                                    }}
                                     placeholder="Enter your name"
                                     placeholderTextColor="#9CA3AF"
                                     autoCapitalize="words"
                                 />
-                                <Text style={styles.helperText}>This name will be visible to your students.</Text>
+                                <Text style={styles.helperText}>This name will be visible to others.</Text>
                             </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Email Address</Text>
+                                {errors.email && <Text style={styles.inlineErrorText}>{errors.email}</Text>}
+                                <TextInput
+                                    style={[
+                                        styles.input, 
+                                        errors.email ? styles.inputError : null,
+                                        user?.role === 'student' ? { backgroundColor: '#E5E7EB', color: '#6B7280' } : null
+                                    ]}
+                                    value={email}
+                                    onChangeText={(text) => {
+                                        setEmail(text);
+                                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                                    }}
+                                    placeholder="Enter your email"
+                                    placeholderTextColor="#9CA3AF"
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    editable={user?.role !== 'student'}
+                                />
+                                {user?.role === 'student' && (
+                                    <Text style={styles.helperText}>Email cannot be changed for student accounts.</Text>
+                                )}
+                            </View>
+
+                            {user?.role === 'student' && (
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>Student ID</Text>
+                                    {errors.studentId && <Text style={styles.inlineErrorText}>{errors.studentId}</Text>}
+                                    <TextInput
+                                        style={[styles.input, errors.studentId ? styles.inputError : null]}
+                                        value={studentId}
+                                        onChangeText={(text) => {
+                                            setStudentId(text);
+                                            if (errors.studentId) setErrors(prev => ({ ...prev, studentId: '' }));
+                                        }}
+                                        placeholder="Enter your Student ID"
+                                        placeholderTextColor="#9CA3AF"
+                                        autoCapitalize="characters"
+                                    />
+                                </View>
+                            )}
                         </View>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Security</Text>
+                        <TouchableOpacity
+                            style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.md }]}
+                            onPress={() => router.push('/change-password')}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }}>
+                                    <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={20} color="#DC2626" />
+                                </View>
+                                <View>
+                                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#374151' }}>Change Password</Text>
+                                    <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Update your account password</Text>
+                                </View>
+                            </View>
+                            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color="#9CA3AF" />
+                        </TouchableOpacity>
                     </View>
 
                     {user?.role === 'lecturer' && (
@@ -446,6 +555,29 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#FFFFFF',
         fontWeight: '600',
+    },
+    errorContainer: {
+        marginTop: spacing.sm,
+        padding: spacing.sm,
+        backgroundColor: '#FEF2F2',
+        borderRadius: borderRadius.sm,
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+    },
+    errorText: {
+        color: '#DC2626',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    inlineErrorText: {
+        color: '#DC2626',
+        fontSize: 12,
+        fontWeight: '500',
+        marginBottom: spacing.xs,
+    },
+    inputError: {
+        borderColor: '#FCA5A5',
+        backgroundColor: '#FEF2F2',
     },
     // Course List Styles
     addButton: {
