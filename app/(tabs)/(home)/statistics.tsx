@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Types
 interface Course {
@@ -31,6 +32,7 @@ interface StudentAttendance {
 export default function StatisticsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
     
     const [loading, setLoading] = useState(true);
     const [courses, setCourses] = useState<Course[]>([]);
@@ -48,10 +50,12 @@ export default function StatisticsScreen() {
     const [sessionsList, setSessionsList] = useState<SessionData[]>([]);
     const [sessionFound, setSessionFound] = useState<boolean | null>(null); // null = loading/init, true, false
 
-    // 1. Fetch Courses on Mount
+    // 1. Fetch Courses when user is available
     useEffect(() => {
-        fetchCourses();
-    }, []);
+        if (user?.id) {
+            fetchCourses();
+        }
+    }, [user?.id]);
 
     // 2. Fetch Attendance when Course or Week changes
     useEffect(() => {
@@ -61,11 +65,14 @@ export default function StatisticsScreen() {
     }, [selectedCourse, selectedWeek]);
 
     const fetchCourses = async () => {
+        if (!user?.id) return;
+        
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('courses')
                 .select('id, name, code')
+                .eq('lecturer_id', user.id)
                 .order('name');
 
             if (error) throw error;

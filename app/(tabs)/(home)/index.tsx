@@ -26,39 +26,57 @@ export default function DashboardScreen() {
 
   const fetchDashboard = useCallback(async (selectedWeek: string) => {
     try {
-      // Fetch total student count for "Total Students" (all enrolled students)
-      const { count: studentCount } = await supabase
-        .from('user')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'student');
-
       // Fetch ALL created sessions count for this lecturer's courses
-      // First, get the courses to filter by this user's courses
-      const { data: userCourses } = await supabase
-        .from('courses')
-        .select('id');
+      let userCoursesQuery = supabase.from('courses').select('id');
+      if (user?.id) {
+        userCoursesQuery = userCoursesQuery.eq('lecturer_id', user.id);
+      }
+      const { data: userCourses } = await userCoursesQuery;
         
       let sessionsCount = 0;
+      let totalEnrolledAll = 0;
+      
       if (userCourses && userCourses.length > 0) {
         const courseIds = userCourses.map(c => c.id);
-        const { count } = await supabase
+        
+        // Get sessions count
+        const { count: sessionCountResult } = await supabase
           .from('attendance_sessions')
           .select('*', { count: 'exact', head: true })
           .in('course_id', courseIds);
+        sessionsCount = sessionCountResult || 0;
         
-        sessionsCount = count || 0;
+        // Get unique enrolled students across ALL these courses
+        const { data: enrollments } = await supabase
+          .from('course_enrollments')
+          .select('student_id')
+          .in('course_id', courseIds);
+          
+        if (enrollments) {
+          const uniqueStudents = new Set(enrollments.map(e => e.student_id));
+          totalEnrolledAll = uniqueStudents.size;
+        }
       }
 
       // Extract week number from string "Week 1", etc.
       const weekNumber = parseInt(selectedWeek.replace('Week ', ''), 10);
 
       // Fetch courses for the list
-      const { data: coursesData } = await supabase
-        .from('courses')
-        .select('id, name, code')
-        .limit(5);
+      let coursesDataQuery = supabase.from('courses').select('id, name, code').limit(5);
+      if (user?.id) {
+        coursesDataQuery = coursesDataQuery.eq('lecturer_id', user.id);
+      }
+      const { data: coursesData } = await coursesDataQuery;
 
-      const mappedCourses = await Promise.all((coursesData || []).map(async (c, index) => {
+      const mappedCourses = await Promise.all((coursesData || []).map(async (c) => {
+        // Get enrolled student count for THIS specific course
+        const { count: enrolledCount } = await supabase
+          .from('course_enrollments')
+          .select('*', { count: 'exact', head: true })
+          .eq('course_id', c.id);
+
+        const totalEnrolled = enrolledCount || 0;
+
         // Find sessions for this course AND this specific week
         const { data: sessions } = await supabase
           .from('attendance_sessions')
@@ -67,8 +85,6 @@ export default function DashboardScreen() {
           .eq('week', weekNumber);
 
         let presentCount = 0;
-        // Enrolled students in the system (like in statistics.tsx)
-        const totalEnrolled = studentCount || 0; 
 
         if (sessions && sessions.length > 0) {
           const sessionIds = sessions.map(s => s.id);
@@ -84,7 +100,7 @@ export default function DashboardScreen() {
           }
         }
 
-        // Calculate percentage according to new requirement: (present / total students) * 100
+        // Calculate percentage: (present / enrolled in THIS course) * 100
         let calcPercentage = 0;
         if (totalEnrolled > 0) {
             calcPercentage = Math.round((presentCount / totalEnrolled) * 100);
@@ -96,9 +112,6 @@ export default function DashboardScreen() {
         else if (calcPercentage <= 30) percentColor = '#F97316'; // orange 11-30%
         else if (calcPercentage <= 50) percentColor = '#EAB308'; // yellow 31-50%
         else if (calcPercentage <= 70) percentColor = '#84CC16'; // lime 51-70%
-        
-        // Show the actual number of enrolled students as total
-        const displayTotal = totalEnrolled;
 
         return {
           id: c.id,
@@ -106,7 +119,7 @@ export default function DashboardScreen() {
           name: c.name,
           percentage: calcPercentage,
           current: presentCount,
-          total: displayTotal,
+          total: totalEnrolled,
           color: percentColor,
           badgeText: `${calcPercentage}% ↑`,
           isWeekBadge: false
@@ -116,7 +129,7 @@ export default function DashboardScreen() {
       // Set state
       setDashboardData({
         ongoingSessions: sessionsCount || 0,
-        todayScans: studentCount || 0,
+        todayScans: totalEnrolledAll,
         lecturerName: user?.name || 'Lecturer', 
       });
       
@@ -237,7 +250,7 @@ export default function DashboardScreen() {
               activeOpacity={0.7}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
-                <Text style={[styles.statTitle, { marginBottom: 0 }]}>Total Students</Text>
+                <Text style={[styles.statTitle, { marginBottom: 0 }]}>Enrolled Students</Text>
                 <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color="#DBEAFE" />
               </View>
               <Text style={styles.statValue}>{dashboardData.todayScans}</Text>

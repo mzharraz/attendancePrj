@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, FlatList, Modal, Pressable, Alert, Platform } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -44,12 +44,22 @@ export default function RosterScreen() {
         }
     }, [selectedCourse]);
 
+    // Re-fetch students whenever this screen gains focus (e.g. after scanning)
+    useFocusEffect(
+        useCallback(() => {
+            if (selectedCourse) {
+                fetchEnrolledStudents();
+            }
+        }, [selectedCourse])
+    );
+
     const fetchCourses = async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('courses')
                 .select('id, name, code')
+                .eq('lecturer_id', user!.id)
                 .order('name');
 
             if (error) throw error;
@@ -70,30 +80,42 @@ export default function RosterScreen() {
         try {
             setLoading(true);
             
-            const { data, error } = await supabase
+            // Step 1: Get enrollment records for this course
+            const { data: enrollments, error: enrollError } = await supabase
                 .from('course_enrollments')
-                .select(`
-                    enrolled_at,
-                    user:student_id (
-                        id,
-                        name,
-                        student_id
-                    )
-                `)
+                .select('student_id, enrolled_at')
                 .eq('course_id', selectedCourse.id)
                 .order('enrolled_at', { ascending: true });
 
-            if (error) throw error;
+            if (enrollError) throw enrollError;
 
-            if (data) {
-                const mappedStudents = data
-                    .map((record: any) => ({
-                        id: record.user?.id,
-                        name: record.user?.name || 'Unknown',
-                        student_id: record.user?.student_id || 'N/A',
-                        enrolled_at: record.enrolled_at
-                    }))
-                    .filter(s => s.id) as EnrolledStudent[];
+            if (enrollments && enrollments.length > 0) {
+                // Step 2: Get user details for all enrolled student IDs
+                const studentIds = enrollments.map((e: any) => e.student_id);
+                console.log('[Roster] Found enrollments, student IDs:', studentIds);
+                
+                const { data: users, error: userError } = await supabase
+                    .from('user')
+                    .select('id, name, student_id')
+                    .in('id', studentIds);
+
+                console.log('[Roster] User query result:', { users, userError });
+                if (userError) throw userError;
+
+                // Build a lookup map for quick access
+                const userMap = new Map<string, any>();
+                (users || []).forEach((u: any) => userMap.set(u.id, u));
+
+                const mappedStudents: EnrolledStudent[] = enrollments
+                    .map((record: any) => {
+                        const u = userMap.get(record.student_id);
+                        return {
+                            id: u?.id || record.student_id,
+                            name: u?.name || 'Unknown',
+                            student_id: u?.student_id || 'N/A',
+                            enrolled_at: record.enrolled_at
+                        };
+                    });
                 
                 // Sort alphabetically
                 mappedStudents.sort((a, b) => a.name.localeCompare(b.name));

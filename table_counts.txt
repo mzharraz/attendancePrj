@@ -1,0 +1,6 @@
+user: range=*/0 status=200
+users: range=null status=404
+courses: range=*/28 status=206
+attendance_sessions: range=*/10 status=206
+attendance_records: range=*/0 status=200
+course_enrollments: range=*/0 status=200

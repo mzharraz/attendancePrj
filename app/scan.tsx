@@ -99,12 +99,12 @@ export default function ScanScreen() {
 
       console.log('Parsed QR data:', qrData);
 
-      // Validate timestamp is within 30 seconds
+      // Validate timestamp is within 60 seconds (allows for clock skew)
       const qrTimestamp = new Date(qrData.timestamp).getTime();
       const now = new Date().getTime();
       const diffSeconds = (now - qrTimestamp) / 1000;
 
-      if (diffSeconds > 30) {
+      if (diffSeconds > 60) {
         setLastScanned({
           name: qrData.name || 'Student',
           status: 'error',
@@ -163,7 +163,7 @@ export default function ScanScreen() {
         }
       }
 
-      // Insert record
+      // Insert attendance record
       const { error: insertError } = await supabase
         .from('attendance_records')
         .insert({
@@ -185,11 +185,36 @@ export default function ScanScreen() {
           throw insertError;
         }
       } else {
-        setLastScanned({
-          name: qrData.name,
-          status: isFirstTime ? 'enrolled' : 'success',
-          message: isFirstTime ? 'First-time registration successful & attendance marked!' : 'Attendance marked successfully.'
-        });
+        // Explicitly enroll the student if this is their first time
+        // This ensures enrollment works even if the DB trigger is missing
+        let enrollmentFailed = false;
+        if (isFirstTime && sessionInfo?.course_id) {
+          const { error: enrollError } = await supabase
+            .from('course_enrollments')
+            .insert({
+              course_id: sessionInfo.course_id,
+              student_id: qrData.studentId,
+            });
+
+          if (enrollError && enrollError.code !== '23505') {
+            console.error('Error enrolling student:', enrollError);
+            enrollmentFailed = true;
+          }
+        }
+
+        if (enrollmentFailed) {
+          setLastScanned({
+            name: qrData.name,
+            status: 'success',
+            message: 'Attendance marked, but enrollment failed. Contact admin.'
+          });
+        } else {
+          setLastScanned({
+            name: qrData.name,
+            status: isFirstTime ? 'enrolled' : 'success',
+            message: isFirstTime ? 'First-time registration successful & attendance marked!' : 'Attendance marked successfully.'
+          });
+        }
         
         playSuccessSound();
       }
@@ -215,6 +240,10 @@ export default function ScanScreen() {
   };
 
   const handleDeleteSession = async () => {
+    if (!sessionId) {
+      Alert.alert('Error', 'No session to delete.');
+      return;
+    }
     Alert.alert(
       'Delete Session',
       'Are you sure you want to delete this session? This will remove all attendance records for this session.',

@@ -41,10 +41,21 @@ create table if not exists public.attendance_records (
 -- Unique index to prevent duplicate attendance records
 create unique index if not exists attendance_records_unique_idx on public.attendance_records (session_id, student_id);
 
+-- 4. Course Enrollments Table (tracks which students are enrolled in which courses)
+create table if not exists public.course_enrollments (
+  id uuid default gen_random_uuid() primary key,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  student_id text not null references public.user(id) on delete cascade,
+  enrolled_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create unique index if not exists course_enrollments_unique_idx on public.course_enrollments (course_id, student_id);
+
 -- Enable Row Level Security (RLS)
 alter table public.courses enable row level security;
 alter table public.attendance_sessions enable row level security;
 alter table public.attendance_records enable row level security;
+alter table public.course_enrollments enable row level security;
 
 -- Policies
 
