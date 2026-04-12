@@ -495,7 +495,7 @@ export default function StatisticsScreen() {
                             </TouchableOpacity>
                         </View>
                         
-                        {['present', 'absent', 'late'].map((statusOption) => (
+                        {['present', 'absent'].map((statusOption) => (
                             <TouchableOpacity
                                 key={statusOption}
                                 style={[

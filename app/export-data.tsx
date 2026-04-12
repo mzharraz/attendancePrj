@@ -198,14 +198,27 @@ export default function ExportDataScreen() {
         try {
             console.log(`Starting export for ${selectedCourse.name}, Week: ${selectedWeek}`);
 
-            // 1. Fetch data
-            const { data: students, error: studentsError } = await supabase
-                .from('user')
-                .select('id, name, student_id')
-                .eq('role', 'student')
-                .order('name');
+            // 1. Fetch enrolled students
+            const { data: enrollments, error: enrollError } = await supabase
+                .from('course_enrollments')
+                .select('student_id')
+                .eq('course_id', selectedCourse.id);
 
-            if (studentsError) throw studentsError;
+            if (enrollError) throw enrollError;
+
+            const studentIds = enrollments ? enrollments.map((e: any) => e.student_id) : [];
+
+            let students: any[] = [];
+            if (studentIds.length > 0) {
+                const { data, error: studentsError } = await supabase
+                    .from('user')
+                    .select('id, name, student_id')
+                    .in('id', studentIds)
+                    .order('name');
+
+                if (studentsError) throw studentsError;
+                students = data || [];
+            }
 
             // Fetch sessions for the selected Week
             const { data: sessions, error: sessionsError } = await supabase
